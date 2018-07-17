@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-resources
+  namespace: foo
+spec:
+  containers:
+  - image: nginx:1.7.9
+    name: nginx
+    ports:
+    - containerPort: 80
+      protocol: TCP
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        memory: 256Mi

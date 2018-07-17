@@ -1,0 +1,27 @@
+
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: default-container-resources
+webhooks:
+  - name: default-container-resources.mutating-webhook.svc
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+    failurePolicy: Fail
+    clientConfig:
+      # url: "${HTTPS_TRIGGER_URL}"
+      service:
+        namespace: mutating-webhook
+        name: default-container-resources
+        path: /mutate
+      # `caBundle` is a PEM encoded CA bundle which will be used to validate
+      # the webhook's server certificate.
+      # Required.
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURDVENDQWZHZ0F3SUJBZ0lKQU5wcjlyNUJVK0NPTUEwR0NTcUdTSWIzRFFFQkN3VUFNQkl4RURBT0JnTlYKQkFNTUIzUmxjM1F0WTJFd0hoY05NVGd3TnpFM01EZ3pOREkwV2hjTk1UZ3dPVEUxTURnek5ESTBXakE3TVRrdwpOd1lEVlFRREREQmtaV1poZFd4MExXTnZiblJoYVc1bGNpMXlaWE52ZFhKalpYTXViWFYwWVhScGJtY3RkMlZpCmFHOXZheTV6ZG1Nd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURPa1d0UzNGay8KNTVnTDVPeDMzNk9oWFBLTFNFcEo4MFF2M1FUcmk0b3dvQ0hJb05hK3lYQ0ZMaWFPNWpsWFRmbHdnQS9JKzg2YwpKcUptclViT0ZTVGNBV2RMcDcvVVhUc2N0aTRJNktLOWxnWG53TkFXRVZES3lvQ0RKMlFMdEs3VktaeHJnQTdXClBpMlNLS3EvamVlMkxZSzRyUGRtRkR0R2lPZ2EvV0ZaKzMvb0tFOVNnVXNmV3FHcEV1TTN4WVdqaVdDS3ZuL3cKWm9pUmxTcmlhZk1yNkVFM1BlUS9XNnpUWERvOS9ETGNUTzZRRk9CY0ZSSUZTK1hwcVhobHhWYnNHUEtxRnhERgpueDZpOVJoN1Y1TW5McWpRZytCRm5KRzJpa1ZlcG9wb1RJbktuRUs3WjlnNmY3ajdYenlNcy83b1A3Lys4bUZ6CmVWUGdWUk9WMXphMUFnTUJBQUdqT1RBM01Ba0dBMVVkRXdRQ01BQXdDd1lEVlIwUEJBUURBZ1hnTUIwR0ExVWQKSlFRV01CUUdDQ3NHQVFVRkJ3TUNCZ2dyQmdFRkJRY0RBVEFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBYzViOQo3NUJFdjc0alAvWjQybVdMaEJkc3pRKzc5VzRUYkJtWHNoS2RTdk9MdFFQY2ppOS91NVcrbDNpVG5XVURaUzRNCnpxMGNIQkVrZjZ1NWdONlUyM1JwdjlCMkJ2Vk5Wc3lpNWJUYVI3dkU2bXd4T3NsMDhSZkRUSE1hMEtlTG5vNTQKQWgvd1hEWU9Jb2hDY2RkZ2hkaTh4MGM4UWVHb1hVbGxtVHdkUkdaa1NseklvR2svcTc5c2xLN1dJNTluandzOApvYnM3YW9QaU9HMXlEYlhzUEdQN040cHh6UkxnY3EvdjNiQzNFangxb1E3TzRjMER5cktRUEsycmNwa2RVcnhmCitjL1lDRk9FL0VKVVJEaFpRS1VNUTBkcC9jR0d2U2ZadDdENnp6cE1qbjVqR1lDRVFqYXZCMVpTaXVPNXpuSzgKK2JTc0VoK1JKUElGQkZNZExnPT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=

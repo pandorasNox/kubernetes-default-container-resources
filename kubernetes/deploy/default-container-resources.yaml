@@ -1,0 +1,48 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: default-container-resources
+  namespace: mutating-webhook
+spec:
+  type: ClusterIP
+  selector:
+    app: default-container-resources
+  ports:
+  - name: port-1
+    port: 443
+    protocol: TCP
+    targetPort: 8083
+status:
+  loadBalancer: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: default-container-resources
+  namespace: mutating-webhook
+  labels:
+    app: default-container-resources
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: default-container-resources
+  template:
+    metadata:
+      labels:
+        app: default-container-resources
+    spec:
+      containers:
+      - name: default-container-resources
+        image:  pandorasnox/kubernetes-default-container-resources:1.0.0
+        ports:
+        - containerPort: 8083
+        volumeMounts:
+        - name: tls-certs
+          mountPath: "/certs"
+          readOnly: true
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: tls-cert-default-container-resources
