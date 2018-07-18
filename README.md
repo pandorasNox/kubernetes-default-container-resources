@@ -39,4 +39,5 @@ pod without resources
 ```
 
 
-2e
+###
+- reSorcerer (Resource)

@@ -37,7 +37,7 @@ endif
 .PHONY: build
 build: ##@setup reuse minikube docker env
 	@eval $$(minikube docker-env) ;\
-	docker build -t pandorasnox/kubernetes-default-container-resources:1.0.0 .
+	docker build -t pandorasnox/kubernetes-default-container-resources:1.1.0 .
 
 .PHONY: deploy
 deploy:
@@ -49,3 +49,17 @@ deploy:
 undeploy:
 	kubectl delete -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
+
+.PHONY: clear-minikube-intermediate
+clear-minikube-intermediate:
+	@eval $$(minikube docker-env) ;\
+	docker rmi -f $$(docker images --filter dangling=true -q)
+
+.PHONY: test-deploy
+test-deploy:
+	kubectl apply -f kubernetes/example/namespace.yaml \
+		-f kubernetes/example/
+
+.PHONY:test-undeploy
+test-undeploy:
+	kubectl delete -f kubernetes/example/namespace.yaml
