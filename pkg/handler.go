@@ -9,8 +9,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-
-	"github.com/kubernetes/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 // AdmissionReview is a validation/mutation object readable by the kubernetes api server
@@ -22,7 +20,7 @@ type AdmissionReview struct {
 type AdmissionReviewResponse struct {
 	UID       string          `json:"uid"`
 	Allowed   bool            `json:"allowed"`
-	Status    AdmissionStatus `json:"status"`
+	Status    AdmissionStatus `json:"status,omitempty"`
 	Patch     Base64String    `json:"patch"`
 	PatchType string          `json:"patchType"`
 }
@@ -78,17 +76,19 @@ type ComputeUnit struct {
 	Memory string `json:"memory,omitempty"`
 }
 
-// IsEmpty ...
-func (r ComputeResources) IsEmpty() bool {
-	return reflect.DeepEqual(r, ComputeResources{})
+func shouldPatchResources(cr ComputeResources) bool {
+	return reflect.DeepEqual(cr, ComputeResources{})
 }
 
 // ServeContent ...
 func ServeContent(w http.ResponseWriter, r *http.Request) {
+	var err error
+
 	fmt.Println("requestDump:")
 	requestDump, err := httputil.DumpRequest(r, true)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	fmt.Println(string(requestDump))
 	fmt.Println("")
@@ -96,12 +96,26 @@ func ServeContent(w http.ResponseWriter, r *http.Request) {
 	// verify the content type is accurate
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		log.Errorf("contentType=%s, expect application/json", contentType)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotAcceptable)
+		err = json.NewEncoder(w).Encode(struct {
+			Error string `json:"error"`
+		}{
+			Error: "wrong content-type, expect 'application/json'",
+		})
+		if err != nil {
+			fmt.Println(err)
+		}
 		return
 	}
 
 	admissionResponse := &AdmissionResponse{}
-	json.NewDecoder(r.Body).Decode(admissionResponse)
+	err = json.NewDecoder(r.Body).Decode(admissionResponse)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	fmt.Println("admissionResponse:")
 	fmt.Println(admissionResponse)
 	fmt.Println("")
@@ -109,7 +123,7 @@ func ServeContent(w http.ResponseWriter, r *http.Request) {
 	patch := []Operation{}
 	for i, container := range admissionResponse.Request.Object.Spec.Containers {
 
-		if false == container.Resources.IsEmpty() {
+		if !shouldPatchResources(container.Resources) {
 			continue
 		}
 
@@ -132,6 +146,10 @@ func ServeContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonPatch, err := json.Marshal(patch)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	fmt.Println("patch:")
 	fmt.Println(string(jsonPatch))
@@ -147,10 +165,17 @@ func ServeContent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("admissionReview:")
-	json.NewEncoder(os.Stdout).Encode(admissionReview)
+	err = json.NewEncoder(os.Stdout).Encode(admissionReview)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	fmt.Println("")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(admissionReview)
+	err = json.NewEncoder(w).Encode(admissionReview)
+	if err != nil {
+		fmt.Println(err)
+	}
 }

@@ -8,15 +8,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/pandorasnox/kubernetes-default-container-resources/pkg"
+	webhook "github.com/pandorasnox/kubernetes-default-container-resources/pkg"
 )
 
 func main() {
-	var tlsDisabled *bool
-	tlsDisabled = flag.Bool("tlsDisabled", false, "(optional) disables tls for the server")
+	tlsDisabled := flag.Bool("tlsDisabled", false, "(optional) disables tls for the server")
 	flag.Parse()
 
-	fmt.Println("tlsDisabled: ", bool(*tlsDisabled))
+	fmt.Println("tlsDisabled: ", *tlsDisabled)
 	fmt.Println("")
 
 	http.HandleFunc("/mutate", webhook.ServeContent)
