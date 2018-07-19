@@ -1,5 +1,6 @@
 
 include ./hack/help.mk
+include ./hack/lint.mk
 
 UID:=$(shell id -u)
 GID:=$(shell id -g)
@@ -60,6 +61,6 @@ test-deploy:
 	kubectl apply -f kubernetes/example/namespace.yaml \
 		-f kubernetes/example/
 
-.PHONY:test-undeploy
+.PHONY: test-undeploy
 test-undeploy:
 	kubectl delete -f kubernetes/example/namespace.yaml
