@@ -47,17 +47,20 @@ type AdmissionResponse struct {
 		UID    string
 		Object struct {
 			Spec struct {
-				Containers []struct {
-					Name string
-					Env  []struct {
-						Name  string
-						Value string
-					}
-					Resources ComputeResources
-				}
+				Containers Containers
 			}
 		}
 	}
+}
+
+// Containers ...
+type Containers []struct {
+	Name string
+	Env  []struct {
+		Name  string
+		Value string
+	}
+	Resources ComputeResources
 }
 
 // ComputeResources ...
@@ -149,17 +152,10 @@ func patchCPU(patches []Operation, i, limitCPU, requestCPU string) []Operation {
 	return patches
 }
 
-// ServeContent responds to kubernetes webhooks request to add resource limits.
-func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU, requestMemory, requestCPU string) error {
-
-	admissionResponse := &AdmissionResponse{}
-	err := json.NewDecoder(r.Body).Decode(admissionResponse)
-	if err != nil {
-		return fmt.Errorf("failed to decode body: %s", err)
-	}
+func getAdmissionReview(c Containers, UID, limitMemory, limitCPU, requestMemory, requestCPU string) (AdmissionReview, error) {
 
 	patches := []Operation{}
-	for i, container := range admissionResponse.Request.Object.Spec.Containers {
+	for i, container := range c {
 
 		if isResourcesEmpty(container.Resources) {
 			patches = patchResources(patches, strconv.Itoa(i), limitMemory, limitCPU, requestMemory, requestCPU)
@@ -177,16 +173,35 @@ func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 
 	jsonPatch, err := json.Marshal(patches)
 	if err != nil {
-		return fmt.Errorf("failed to encode patch: %s", err)
+		return AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
 	}
 
 	admissionReview := AdmissionReview{
 		AdmissionReviewResponse{
-			UID:       admissionResponse.Request.UID,
+			UID:       UID,
 			Allowed:   true,
 			Patch:     base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
 			PatchType: "JSONPatch",
 		},
+	}
+
+	return admissionReview, nil
+}
+
+// ServeContent responds to kubernetes webhooks request to add resource limits.
+func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU, requestMemory, requestCPU string) error {
+
+	admissionResponse := &AdmissionResponse{}
+	err := json.NewDecoder(r.Body).Decode(admissionResponse)
+	if err != nil {
+		return fmt.Errorf("failed to decode body: %s", err)
+	}
+
+	containers := admissionResponse.Request.Object.Spec.Containers
+	requestUID := admissionResponse.Request.UID
+	admissionReview, err := getAdmissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
+	if err != nil {
+		return fmt.Errorf("failed to get admissionReview: %s", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
