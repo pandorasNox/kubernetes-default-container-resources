@@ -5,28 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
-	"os"
-	"reflect"
 	"strconv"
 )
 
-// AdmissionReview is a validation/mutation object readable by the kubernetes api server
+// AdmissionReview is a validation/mutation object readable by the kubernetes api server.
 type AdmissionReview struct {
 	Response AdmissionReviewResponse `json:"response"`
 }
 
-// AdmissionReviewResponse is the response wrapper object for the AdmissionReview
+// AdmissionReviewResponse is the response wrapper object for the AdmissionReview.
 type AdmissionReviewResponse struct {
 	UID       string          `json:"uid"`
 	Allowed   bool            `json:"allowed"`
 	Status    AdmissionStatus `json:"status,omitempty"`
-	Patch     Base64String    `json:"patch"`
+	Patch     base64String    `json:"patch"`
 	PatchType string          `json:"patchType"`
 }
 
-//Base64String should be a base64 encoded string
-type Base64String string
+type base64String string
 
 // Operation ...
 // @see http://jsonpatch.com/
@@ -76,106 +72,129 @@ type ComputeUnit struct {
 	Memory string `json:"memory,omitempty"`
 }
 
-func shouldPatchResources(cr ComputeResources) bool {
-	return reflect.DeepEqual(cr, ComputeResources{})
+func isResourcesEmpty(cr ComputeResources) bool {
+	return isMemoryEmpty(cr) && isCPUEmpty(cr)
 }
 
-// ServeContent ...
-func ServeContent(w http.ResponseWriter, r *http.Request) {
-	var err error
+func isMemoryEmpty(cr ComputeResources) bool {
+	return cr.Limits.Memory == "" && cr.Requests.Memory == ""
+}
 
-	fmt.Println("requestDump:")
-	requestDump, err := httputil.DumpRequest(r, true)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(string(requestDump))
-	fmt.Println("")
+func isCPUEmpty(cr ComputeResources) bool {
+	return cr.Limits.CPU == "" && cr.Requests.CPU == ""
+}
 
-	// verify the content type is accurate
-	contentType := r.Header.Get("Content-Type")
-	if contentType != "application/json" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotAcceptable)
-		err = json.NewEncoder(w).Encode(struct {
-			Error string `json:"error"`
-		}{
-			Error: "wrong content-type, expect 'application/json'",
-		})
-		if err != nil {
-			fmt.Println(err)
-		}
-		return
-	}
+func patchResources(patches []Operation, i, limitMemory, limitCPU, requestMemory, requestCPU string) []Operation {
+	// @see http://jsonpatch.com/
+	patches = append(
+		patches,
+		Operation{
+			Op:   "add",
+			Path: "/spec/containers/" + i + "/resources",
+			Value: ComputeResources{
+				Limits: ComputeUnit{
+					Memory: limitMemory,
+					CPU:    limitCPU,
+				},
+				Requests: ComputeUnit{
+					Memory: requestMemory,
+					CPU:    requestCPU,
+				},
+			},
+		},
+	)
+
+	return patches
+}
+
+func patchMemory(patches []Operation, i, limitMemory, requestMemory string) []Operation {
+	patches = append(
+		patches,
+		Operation{
+			Op:    "add",
+			Path:  "/spec/containers/" + i + "/resources/limits/memory",
+			Value: limitMemory,
+		},
+	)
+	patches = append(
+		patches,
+		Operation{
+			Op:    "add",
+			Path:  "/spec/containers/" + i + "/resources/requests/memory",
+			Value: requestMemory,
+		},
+	)
+
+	return patches
+}
+
+func patchCPU(patches []Operation, i, limitCPU, requestCPU string) []Operation {
+	patches = append(
+		patches,
+		Operation{
+			Op:    "add",
+			Path:  "/spec/containers/" + i + "/resources/limits/cpu",
+			Value: limitCPU,
+		},
+	)
+	patches = append(
+		patches,
+		Operation{
+			Op:    "add",
+			Path:  "/spec/containers/" + i + "/resources/requests/cpu",
+			Value: requestCPU,
+		},
+	)
+
+	return patches
+}
+
+// ServeContent responds to kubernetes webhooks request to add resource limits.
+func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU, requestMemory, requestCPU string) error {
 
 	admissionResponse := &AdmissionResponse{}
-	err = json.NewDecoder(r.Body).Decode(admissionResponse)
+	err := json.NewDecoder(r.Body).Decode(admissionResponse)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return fmt.Errorf("failed to decode body: %s", err)
 	}
 
-	fmt.Println("admissionResponse:")
-	fmt.Println(admissionResponse)
-	fmt.Println("")
-
-	patch := []Operation{}
+	patches := []Operation{}
 	for i, container := range admissionResponse.Request.Object.Spec.Containers {
 
-		if !shouldPatchResources(container.Resources) {
+		if isResourcesEmpty(container.Resources) {
+			patches = patchResources(patches, strconv.Itoa(i), limitMemory, limitCPU, requestMemory, requestCPU)
 			continue
 		}
 
-		// @see http://jsonpatch.com/
-		patch = append(
-			patch,
-			Operation{
-				Op:   "add",
-				Path: "/spec/containers/" + strconv.Itoa(i) + "/resources",
-				Value: ComputeResources{
-					Limits: ComputeUnit{
-						Memory: "512Mi",
-					},
-					Requests: ComputeUnit{
-						Memory: "512Mi",
-					},
-				},
-			},
-		)
+		if isMemoryEmpty(container.Resources) {
+			patches = patchMemory(patches, strconv.Itoa(i), limitMemory, requestMemory)
+		}
+
+		if isCPUEmpty(container.Resources) {
+			patches = patchCPU(patches, strconv.Itoa(i), limitCPU, requestCPU)
+		}
 	}
 
-	jsonPatch, err := json.Marshal(patch)
+	jsonPatch, err := json.Marshal(patches)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return fmt.Errorf("failed to encode patch: %s", err)
 	}
-
-	fmt.Println("patch:")
-	fmt.Println(string(jsonPatch))
-	fmt.Println("")
 
 	admissionReview := AdmissionReview{
 		AdmissionReviewResponse{
 			UID:       admissionResponse.Request.UID,
 			Allowed:   true,
-			Patch:     Base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
+			Patch:     base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
 			PatchType: "JSONPatch",
 		},
 	}
 
-	fmt.Println("admissionReview:")
-	err = json.NewEncoder(os.Stdout).Encode(admissionReview)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("")
-
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(admissionReview)
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("failed to send response: %s", err)
 	}
+
+	return nil
 }

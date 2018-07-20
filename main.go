@@ -13,12 +13,21 @@ import (
 
 func main() {
 	tlsDisabled := flag.Bool("tlsDisabled", false, "(optional) disables tls for the server")
+	limitMemory := flag.String("limitMemory", "1G", "memory limit (default 1G)")
+	limitCPU := flag.String("limitCPU", "0.5", "cpu limit (default 0.5 cores)")
+	requestMemory := flag.String("requestMemory", "1G", "memory request (default 1G)")
+	requestCPU := flag.String("requestCPU", "0.1", "cpu request (default 0.1 cores)")
 	flag.Parse()
 
 	fmt.Println("tlsDisabled: ", *tlsDisabled)
 	fmt.Println("")
 
-	http.HandleFunc("/mutate", webhook.ServeContent)
+	http.HandleFunc("/mutate", func(w http.ResponseWriter, r *http.Request) {
+		err := webhook.ServeContent(w, r, *limitMemory, *limitCPU, *requestMemory, *requestCPU)
+		if err != nil {
+			log.Println(err)
+		}
+	})
 
 	server := listenHTTPS
 	if *tlsDisabled {
