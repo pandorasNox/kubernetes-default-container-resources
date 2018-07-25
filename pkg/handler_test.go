@@ -163,7 +163,7 @@ var definePatchesTests = []struct {
 	},
 }
 
-func TestDefineChanges(t *testing.T) {
+func TestDefinePatches(t *testing.T) {
 	for i, tt := range definePatchesTests {
 		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
 			r := definePatches(tt.in.patches, i, tt.in.computeResources, "1G", "0.5", "1G", "0.1")
