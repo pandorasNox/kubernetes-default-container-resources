@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	tlsDisabled := flag.Bool("tlsDisabled", true, "disabled tls for the server")
+	tlsDisabled := flag.Bool("tlsDisabled", false, "disabled tls for the server")
 	limitMemory := flag.String("limitMemory", "1G", "memory limit (default 1G)")
 	limitCPU := flag.String("limitCPU", "0.5", "cpu limit (default 0.5 cores)")
 	requestMemory := flag.String("requestMemory", "1G", "memory request (default 1G)")
