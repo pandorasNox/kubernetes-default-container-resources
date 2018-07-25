@@ -46,23 +46,15 @@ type AdmissionResponse struct {
 		UID    string
 		Object struct {
 			Spec struct {
-				Containers Containers
+				Containers []Container
 			}
 		}
 	}
 }
 
-// Containers representation for kubernetesyaml/json container definition
-type Containers []struct {
-	Name      string
-	Env       []Env
+// Container representation for kubernetesyaml/json container definition
+type Container struct {
 	Resources ComputeResources
-}
-
-// Env representation for kubernetes yaml/json envirmoent entrie definition
-type Env struct {
-	Name  string
-	Value string
 }
 
 // ComputeResources representation for kubernetes yaml/json compute resource definition
@@ -77,8 +69,8 @@ type ComputeUnit struct {
 	Memory string `json:"memory,omitempty"`
 }
 
-// ServeContent responds to kubernetes webhooks request to add resource limits.
-func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU, requestMemory, requestCPU string) error {
+// Mutate responds to kubernetes webhooks request to add resource limits.
+func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU, requestMemory, requestCPU string) error {
 
 	admissionResponse := &AdmissionResponse{}
 	err := json.NewDecoder(r.Body).Decode(admissionResponse)
@@ -88,7 +80,7 @@ func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 
 	containers := admissionResponse.Request.Object.Spec.Containers
 	requestUID := admissionResponse.Request.UID
-	admissionReview, err := getAdmissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
+	admissionReview, err := admissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
 	if err != nil {
 		return fmt.Errorf("failed to get admissionReview: %s", err)
 	}
@@ -103,12 +95,9 @@ func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 	return nil
 }
 
-func getAdmissionReview(containers Containers, UID, memoryLimit, CPULimit, memoryRequest, CPURequest string) (AdmissionReview, error) {
+func admissionReview(containers []Container, UID, memoryLimit, CPULimit, memoryRequest, CPURequest string) (AdmissionReview, error) {
 
-	patches := []Patch{}
-	for i, c := range containers {
-		patches = definePatches(patches, i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest)
-	}
+	patches := podPatches(containers, memoryLimit, CPULimit, memoryRequest, CPURequest)
 
 	jsonPatch, err := json.Marshal(patches)
 	if err != nil {
@@ -125,14 +114,25 @@ func getAdmissionReview(containers Containers, UID, memoryLimit, CPULimit, memor
 	}, nil
 }
 
-func definePatches(patches []Patch, i int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
+func podPatches(containers []Container, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
+	patches := []Patch{}
+	for i, c := range containers {
+		for _, p := range containerPatches(i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest) {
+			patches = append(patches, p)
+		}
+	}
+	return patches
+}
+
+func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
+	patches := []Patch{}
 	if isMemoryEmpty(cr) {
-		patches = append(patches, createPatch(i, "limits/memory", memoryLimit))
-		patches = append(patches, createPatch(i, "requests/memory", memoryRequest))
+		patches = append(patches, createPatch(index, "limits/memory", memoryLimit))
+		patches = append(patches, createPatch(index, "requests/memory", memoryRequest))
 	}
 	if isCPUEmpty(cr) {
-		patches = append(patches, createPatch(i, "limits/cpu", CPULimit))
-		patches = append(patches, createPatch(i, "requests/cpu", CPURequest))
+		patches = append(patches, createPatch(index, "limits/cpu", CPULimit))
+		patches = append(patches, createPatch(index, "requests/cpu", CPURequest))
 	}
 	return patches
 }
