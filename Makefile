@@ -41,26 +41,30 @@ build: ##@setup reuse minikube docker env
 	docker build -t pandorasnox/kubernetes-default-container-resources:1.1.0 .
 
 .PHONY: deploy
-deploy:
+deploy: ##@setup deploys the webhook server + mutate config to the current kubernetes ctx
 	kubectl apply -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/deploy/ \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
 
 .PHONY: undeploy
-undeploy:
+undeploy: ##@setup undeploy the mutate server webhook
 	kubectl delete -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
 
 .PHONY: clear-minikube-intermediate
-clear-minikube-intermediate:
+clear-minikube-intermediate: ##@dev deletes all intermediate docker images on minikube k8s cluster
 	@eval $$(minikube docker-env) ;\
 	docker rmi -f $$(docker images --filter dangling=true -q)
 
 .PHONY: test-deploy
-test-deploy:
+test-deploy: ##@dev deploys a test example
 	kubectl apply -f kubernetes/example/namespace.yaml \
 		-f kubernetes/example/
 
 .PHONY: test-undeploy
-test-undeploy:
+test-undeploy: ##@dev unddeploys a test example
 	kubectl delete -f kubernetes/example/namespace.yaml
+
+.PHONY: test
+test: ##@QA runs all (go) test
+	go test ./pkg/

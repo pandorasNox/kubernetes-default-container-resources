@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 
-	webhook "github.com/pandorasnox/kubernetes-default-container-resources/pkg"
+	"github.com/pandorasnox/kubernetes-default-container-resources/pkg"
 )
 
 func main() {
@@ -17,33 +17,40 @@ func main() {
 	limitCPU := flag.String("limitCPU", "0.5", "cpu limit (default 0.5 cores)")
 	requestMemory := flag.String("requestMemory", "1G", "memory request (default 1G)")
 	requestCPU := flag.String("requestCPU", "0.1", "cpu request (default 0.1 cores)")
+	addr := flag.String("addr", ":8083", "address to bind to")
+	sslCert := flag.String("sslCert", "/certs/ssl-cert.pem", "address to bind to")
+	sslKey := flag.String("sslKey", "/certs/ssl-key.pem", "address to bind to")
 	flag.Parse()
 
 	fmt.Println("tlsDisabled: ", *tlsDisabled)
 	fmt.Println("")
 
-	http.HandleFunc("/mutate", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		err := webhook.ServeContent(w, r, *limitMemory, *limitCPU, *requestMemory, *requestCPU)
 		if err != nil {
 			log.Println(err)
 		}
 	})
 
-	server := listenHTTPS
-	if *tlsDisabled {
-		server = listenHTTP
-	}
-	log.Fatal(server())
+	log.Fatal(server(*addr, *sslCert, *sslKey, *tlsDisabled))
 }
 
-func listenHTTP() error {
+func server(addr, sslCert, sslKey string, tlsDisabled bool) error {
+	if tlsDisabled {
+		return listenHTTP(addr)
+	}
+
+	return listenHTTPS(addr, sslCert, sslKey)
+}
+
+func listenHTTP(addr string) error {
 	server := &http.Server{
-		Addr: ":8083",
+		Addr: addr,
 	}
 	return server.ListenAndServe()
 }
 
-func listenHTTPS() error {
+func listenHTTPS(addr, sslCert, sslKey string) error {
 	cfg := &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -57,8 +64,8 @@ func listenHTTPS() error {
 		},
 	}
 	server := &http.Server{
-		Addr:      ":8083",
+		Addr:      addr,
 		TLSConfig: cfg,
 	}
-	return server.ListenAndServeTLS("/certs/ssl-cert.pem", "/certs/ssl-key.pem")
+	return server.ListenAndServeTLS(sslCert, sslKey)
 }

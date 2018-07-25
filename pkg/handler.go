@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // AdmissionReview is a validation/mutation object readable by the kubernetes api server.
@@ -24,15 +23,15 @@ type AdmissionReviewResponse struct {
 
 type base64String string
 
-// Operation ...
+// Patch represents a single JSONPatch operation
 // @see http://jsonpatch.com/
-type Operation struct {
+type Patch struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
 	Value interface{} `json:"value"`
 }
 
-// AdmissionStatus ...
+// AdmissionStatus JSON/struct wrapper for the status field of the AdmissionReviewResponse
 type AdmissionStatus struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
@@ -40,7 +39,7 @@ type AdmissionStatus struct {
 	Code    int    `json:"code"`
 }
 
-// AdmissionResponse ...
+// AdmissionResponse wrapper for the incomming response from kubernetes
 type AdmissionResponse struct {
 	Kind    string `json:"kind"`
 	Request struct {
@@ -53,139 +52,29 @@ type AdmissionResponse struct {
 	}
 }
 
-// Containers ...
+// Containers representation for kubernetesyaml/json container definition
 type Containers []struct {
-	Name string
-	Env  []struct {
-		Name  string
-		Value string
-	}
+	Name      string
+	Env       []Env
 	Resources ComputeResources
 }
 
-// ComputeResources ...
+// Env representation for kubernetes yaml/json envirmoent entrie definition
+type Env struct {
+	Name  string
+	Value string
+}
+
+// ComputeResources representation for kubernetes yaml/json compute resource definition
 type ComputeResources struct {
 	Limits   ComputeUnit `json:"limits,omitempty"`
 	Requests ComputeUnit `json:"requests,omitempty"`
 }
 
-// ComputeUnit ...
+// ComputeUnit representation for kubernetes yaml/json single compute resource definition
 type ComputeUnit struct {
 	CPU    string `json:"cpu,omitempty"`
 	Memory string `json:"memory,omitempty"`
-}
-
-func isResourcesEmpty(cr ComputeResources) bool {
-	return isMemoryEmpty(cr) && isCPUEmpty(cr)
-}
-
-func isMemoryEmpty(cr ComputeResources) bool {
-	return cr.Limits.Memory == "" && cr.Requests.Memory == ""
-}
-
-func isCPUEmpty(cr ComputeResources) bool {
-	return cr.Limits.CPU == "" && cr.Requests.CPU == ""
-}
-
-func patchResources(patches []Operation, i, limitMemory, limitCPU, requestMemory, requestCPU string) []Operation {
-	// @see http://jsonpatch.com/
-	patches = append(
-		patches,
-		Operation{
-			Op:   "add",
-			Path: "/spec/containers/" + i + "/resources",
-			Value: ComputeResources{
-				Limits: ComputeUnit{
-					Memory: limitMemory,
-					CPU:    limitCPU,
-				},
-				Requests: ComputeUnit{
-					Memory: requestMemory,
-					CPU:    requestCPU,
-				},
-			},
-		},
-	)
-
-	return patches
-}
-
-func patchMemory(patches []Operation, i, limitMemory, requestMemory string) []Operation {
-	patches = append(
-		patches,
-		Operation{
-			Op:    "add",
-			Path:  "/spec/containers/" + i + "/resources/limits/memory",
-			Value: limitMemory,
-		},
-	)
-	patches = append(
-		patches,
-		Operation{
-			Op:    "add",
-			Path:  "/spec/containers/" + i + "/resources/requests/memory",
-			Value: requestMemory,
-		},
-	)
-
-	return patches
-}
-
-func patchCPU(patches []Operation, i, limitCPU, requestCPU string) []Operation {
-	patches = append(
-		patches,
-		Operation{
-			Op:    "add",
-			Path:  "/spec/containers/" + i + "/resources/limits/cpu",
-			Value: limitCPU,
-		},
-	)
-	patches = append(
-		patches,
-		Operation{
-			Op:    "add",
-			Path:  "/spec/containers/" + i + "/resources/requests/cpu",
-			Value: requestCPU,
-		},
-	)
-
-	return patches
-}
-
-func getAdmissionReview(c Containers, UID, limitMemory, limitCPU, requestMemory, requestCPU string) (AdmissionReview, error) {
-
-	patches := []Operation{}
-	for i, container := range c {
-
-		if isResourcesEmpty(container.Resources) {
-			patches = patchResources(patches, strconv.Itoa(i), limitMemory, limitCPU, requestMemory, requestCPU)
-			continue
-		}
-
-		if isMemoryEmpty(container.Resources) {
-			patches = patchMemory(patches, strconv.Itoa(i), limitMemory, requestMemory)
-		}
-
-		if isCPUEmpty(container.Resources) {
-			patches = patchCPU(patches, strconv.Itoa(i), limitCPU, requestCPU)
-		}
-	}
-
-	jsonPatch, err := json.Marshal(patches)
-	if err != nil {
-		return AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
-	}
-
-	admissionReview := AdmissionReview{
-		AdmissionReviewResponse{
-			UID:       UID,
-			Allowed:   true,
-			Patch:     base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
-			PatchType: "JSONPatch",
-		},
-	}
-
-	return admissionReview, nil
 }
 
 // ServeContent responds to kubernetes webhooks request to add resource limits.
@@ -212,4 +101,54 @@ func ServeContent(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 	}
 
 	return nil
+}
+
+func getAdmissionReview(containers Containers, UID, memoryLimit, CPULimit, memoryRequest, CPURequest string) (AdmissionReview, error) {
+
+	patches := []Patch{}
+	for i, c := range containers {
+		patches = definePatches(patches, i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest)
+	}
+
+	jsonPatch, err := json.Marshal(patches)
+	if err != nil {
+		return AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
+	}
+
+	return AdmissionReview{
+		AdmissionReviewResponse{
+			UID:       UID,
+			Allowed:   true,
+			Patch:     base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
+			PatchType: "JSONPatch",
+		},
+	}, nil
+}
+
+func definePatches(patches []Patch, i int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
+	if isMemoryEmpty(cr) {
+		patches = append(patches, createPatch(i, "limits/memory", memoryLimit))
+		patches = append(patches, createPatch(i, "requests/memory", memoryRequest))
+	}
+	if isCPUEmpty(cr) {
+		patches = append(patches, createPatch(i, "limits/cpu", CPULimit))
+		patches = append(patches, createPatch(i, "requests/cpu", CPURequest))
+	}
+	return patches
+}
+
+func isMemoryEmpty(cr ComputeResources) bool {
+	return cr.Limits.Memory == "" && cr.Requests.Memory == ""
+}
+
+func isCPUEmpty(cr ComputeResources) bool {
+	return cr.Limits.CPU == "" && cr.Requests.CPU == ""
+}
+
+func createPatch(index int, resource, amount string) Patch {
+	return Patch{
+		Op:    "add",
+		Path:  fmt.Sprintf("/spec/containers/%d/resources/%s", index, resource),
+		Value: amount,
+	}
 }
