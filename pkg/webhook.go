@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // AdmissionReview is a validation/mutation object readable by the kubernetes api server.
@@ -33,10 +34,10 @@ type Patch struct {
 
 // AdmissionStatus JSON/struct wrapper for the status field of the AdmissionReviewResponse
 type AdmissionStatus struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Reason  string `json:"reason"`
-	Code    int    `json:"code"`
+	Status  string `json:"status,omitempty"`
+	Message string `json:"message,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Code    int    `json:"code,omitempty"`
 }
 
 // AdmissionResponse wrapper for the incomming response from kubernetes
@@ -127,14 +128,38 @@ func podPatches(containers []Container, memoryLimit, CPULimit, memoryRequest, CP
 
 func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
 	patches := []Patch{}
-	if isMemoryEmpty(cr) {
-		patches = append(patches, createPatch("add", index, "resources/limits/memory", memoryLimit))
-		patches = append(patches, createPatch("add", index, "resources/requests/memory", memoryRequest))
+
+	patchValue := ComputeResources{
+		Limits: ComputeUnit{
+			Memory: memoryLimit,
+			CPU:    CPULimit,
+		},
+		Requests: ComputeUnit{
+			Memory: memoryRequest,
+			CPU:    CPURequest,
+		},
 	}
-	if isCPUEmpty(cr) {
-		patches = append(patches, createPatch("add", index, "resources/limits/cpu", CPULimit))
-		patches = append(patches, createPatch("add", index, "resources/requests/cpu", CPURequest))
+
+	if !isMemoryEmpty(cr) {
+		patchValue.Limits.Memory = cr.Limits.Memory
+		patchValue.Requests.Memory = cr.Requests.Memory
 	}
+	if !isCPUEmpty(cr) {
+		patchValue.Limits.CPU = cr.Limits.CPU
+		patchValue.Requests.CPU = cr.Requests.CPU
+	}
+
+	if patchValue.Limits.Memory == "" && patchValue.Requests.Memory == "" && patchValue.Limits.CPU == "" && patchValue.Requests.CPU == "" {
+		return patches
+	}
+
+	patches = append(patches, createPatch(
+		"replace",
+		index,
+		"resources",
+		patchValue,
+	))
+
 	return patches
 }
 
@@ -146,10 +171,10 @@ func isCPUEmpty(cr ComputeResources) bool {
 	return cr.Limits.CPU == "" && cr.Requests.CPU == ""
 }
 
-func createPatch(op string, index int, containerSubPath, value string) Patch {
+func createPatch(op string, index int, containerSubPath, value interface{}) Patch {
 	return Patch{
 		Op:    op,
-		Path:  fmt.Sprintf("/spec/containers/%d/%s", index, containerSubPath),
+		Path:  strings.TrimRight(fmt.Sprintf("/spec/containers/%d/%s", index, containerSubPath), "/"),
 		Value: value,
 	}
 }
