@@ -68,5 +68,9 @@ pod without resources
 ###
 - reSorcerer (Resource)
 
+```
+kubectl -n foo patch pod pod-with-resources --type json -p='[{"op": "add","path": "/spec/containers/0/resources/limits/memory","value": "64Mi"}]'
+```
+
 ### usefull tools
 - https://json-patch-builder-online.github.io/

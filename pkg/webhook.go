@@ -117,7 +117,8 @@ func admissionReview(containers []Container, UID, memoryLimit, CPULimit, memoryR
 func podPatches(containers []Container, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
 	patches := []Patch{}
 	for i, c := range containers {
-		for _, p := range containerPatches(i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest) {
+		containerPatches := containerPatches(i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest)
+		for _, p := range containerPatches {
 			patches = append(patches, p)
 		}
 	}
@@ -127,12 +128,12 @@ func podPatches(containers []Container, memoryLimit, CPULimit, memoryRequest, CP
 func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
 	patches := []Patch{}
 	if isMemoryEmpty(cr) {
-		patches = append(patches, createPatch(index, "limits/memory", memoryLimit))
-		patches = append(patches, createPatch(index, "requests/memory", memoryRequest))
+		patches = append(patches, createPatch("add", index, "resources/limits/memory", memoryLimit))
+		patches = append(patches, createPatch("add", index, "resources/requests/memory", memoryRequest))
 	}
 	if isCPUEmpty(cr) {
-		patches = append(patches, createPatch(index, "limits/cpu", CPULimit))
-		patches = append(patches, createPatch(index, "requests/cpu", CPURequest))
+		patches = append(patches, createPatch("add", index, "resources/limits/cpu", CPULimit))
+		patches = append(patches, createPatch("add", index, "resources/requests/cpu", CPURequest))
 	}
 	return patches
 }
@@ -145,10 +146,10 @@ func isCPUEmpty(cr ComputeResources) bool {
 	return cr.Limits.CPU == "" && cr.Requests.CPU == ""
 }
 
-func createPatch(index int, resource, amount string) Patch {
+func createPatch(op string, index int, containerSubPath, value string) Patch {
 	return Patch{
-		Op:    "add",
-		Path:  fmt.Sprintf("/spec/containers/%d/resources/%s", index, resource),
-		Value: amount,
+		Op:    op,
+		Path:  fmt.Sprintf("/spec/containers/%d/%s", index, containerSubPath),
+		Value: value,
 	}
 }
