@@ -129,6 +129,10 @@ func podPatches(containers []Container, memoryLimit, CPULimit, memoryRequest, CP
 func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, memoryRequest, CPURequest string) []Patch {
 	patches := []Patch{}
 
+	if memoryAndCPUPairExists(cr) {
+		return patches
+	}
+
 	patchValue := ComputeResources{
 		Limits: ComputeUnit{
 			Memory: memoryLimit,
@@ -149,10 +153,6 @@ func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, mem
 		patchValue.Requests.CPU = cr.Requests.CPU
 	}
 
-	if patchValue.Limits.Memory == "" && patchValue.Requests.Memory == "" && patchValue.Limits.CPU == "" && patchValue.Requests.CPU == "" {
-		return patches
-	}
-
 	patches = append(patches, createPatch(
 		"replace",
 		index,
@@ -161,6 +161,13 @@ func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, mem
 	))
 
 	return patches
+}
+
+func memoryAndCPUPairExists(cr ComputeResources) bool {
+	return (cr.Limits.Memory != "" && cr.Limits.CPU != "") ||
+		(cr.Requests.Memory != "" && cr.Requests.CPU != "") ||
+		(cr.Limits.Memory != "" && cr.Requests.CPU != "") ||
+		(cr.Requests.Memory != "" && cr.Limits.CPU != "")
 }
 
 func isMemoryEmpty(cr ComputeResources) bool {

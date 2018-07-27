@@ -16,11 +16,25 @@ var singeContainerPodTests = []struct {
 				Resources: ComputeResources{},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
-			Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
-			Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+			Patch{"replace", "/spec/containers/0/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.1",
+					},
+				},
+			},
 		},
 	},
 	{
@@ -33,9 +47,22 @@ var singeContainerPodTests = []struct {
 				},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+			Patch{"replace", "/spec/containers/0/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						CPU: "0.1",
+					},
+				},
+			},
 		},
 	},
 	{
@@ -48,9 +75,22 @@ var singeContainerPodTests = []struct {
 				},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+			Patch{"replace", "/spec/containers/0/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						CPU: "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.1",
+					},
+				},
+			},
 		},
 	},
 	{
@@ -63,9 +103,22 @@ var singeContainerPodTests = []struct {
 				},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
-			Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
+			Patch{"replace", "/spec/containers/0/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+					},
+				},
+			},
 		},
 	},
 	{
@@ -139,15 +192,41 @@ var multiContainerPodTests = []struct {
 				Resources: ComputeResources{},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
+		// 	Patch{"add", "/spec/containers/1/resources/limits/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/1/resources/requests/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/1/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/1/resources/requests/cpu", "0.1"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/0/resources/limits/memory", "1G"},
-			Patch{"add", "/spec/containers/0/resources/requests/memory", "1G"},
-			Patch{"add", "/spec/containers/0/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/0/resources/requests/cpu", "0.1"},
-			Patch{"add", "/spec/containers/1/resources/limits/memory", "1G"},
-			Patch{"add", "/spec/containers/1/resources/requests/memory", "1G"},
-			Patch{"add", "/spec/containers/1/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/1/resources/requests/cpu", "0.1"},
+			Patch{"replace", "/spec/containers/0/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.1",
+					},
+				},
+			},
+			Patch{"replace", "/spec/containers/1/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.1",
+					},
+				},
+			},
 		},
 	},
 	{
@@ -166,11 +245,25 @@ var multiContainerPodTests = []struct {
 				Resources: ComputeResources{},
 			},
 		},
+		// []Patch{
+		// 	Patch{"add", "/spec/containers/1/resources/limits/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/1/resources/requests/memory", "1G"},
+		// 	Patch{"add", "/spec/containers/1/resources/limits/cpu", "0.5"},
+		// 	Patch{"add", "/spec/containers/1/resources/requests/cpu", "0.1"},
+		// },
 		[]Patch{
-			Patch{"add", "/spec/containers/1/resources/limits/memory", "1G"},
-			Patch{"add", "/spec/containers/1/resources/requests/memory", "1G"},
-			Patch{"add", "/spec/containers/1/resources/limits/cpu", "0.5"},
-			Patch{"add", "/spec/containers/1/resources/requests/cpu", "0.1"},
+			Patch{"replace", "/spec/containers/1/resources",
+				ComputeResources{
+					Limits: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.5",
+					},
+					Requests: ComputeUnit{
+						Memory: "1G",
+						CPU:    "0.1",
+					},
+				},
+			},
 		},
 	},
 }
