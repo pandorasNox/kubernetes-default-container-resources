@@ -144,6 +144,7 @@ func containerPatches(index int, cr ComputeResources, memoryLimit, CPULimit, mem
 		},
 	}
 
+	//keep original demanded compute values
 	if !isMemoryEmpty(cr) {
 		patchValue.Limits.Memory = cr.Limits.Memory
 		patchValue.Requests.Memory = cr.Requests.Memory
