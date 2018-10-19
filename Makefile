@@ -16,17 +16,16 @@ cli: ##@setup set up a docker container with mounted source where you can execut
 	docker run -it --rm -v $(PWD):/go/src/k8s-resource-mutator -w /go/src/k8s-resource-mutator -v $(PWD)/certs:/certs -p 8083:8083 golang:1.10.3 bash
 
 # If the first argument is "do"...
-ifeq (do,$(firstword $(MAKECMDGOALS)))
+ifeq (mini-do,$(firstword $(MAKECMDGOALS)))
   # use the rest as arguments for "do"
   DO_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   # ...and turn them into do-nothing targets
   $(eval $(DO_ARGS):;@:)
 endif
-.PHONY: do
-do: ##@setup reuse minikube docker env
+.PHONY: mini-do
+mini-do: ##@minikube reuse minikube docker env
 	@eval $$(minikube docker-env) ;\
 	docker $(DO_ARGS)
-
 
 # If the first argument is "run"...
 ifeq (build,$(firstword $(MAKECMDGOALS)))
@@ -35,8 +34,8 @@ ifeq (build,$(firstword $(MAKECMDGOALS)))
   # ...and turn them into do-nothing targets
   $(eval $(DO_ARGS):;@:)
 endif
-.PHONY: build
-build: ##@setup reuse minikube docker env
+.PHONY: mini-build
+mini-build: ##@minikube reuse minikube docker env
 	@eval $$(minikube docker-env) ;\
 	docker build -t pandorasnox/kubernetes-default-container-resources:1.1.0 .
 
@@ -51,8 +50,8 @@ undeploy: ##@setup undeploy the mutate server webhook
 	kubectl delete -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
 
-.PHONY: clear-minikube-intermediate
-clear-minikube-intermediate: ##@dev deletes all intermediate docker images on minikube k8s cluster
+.PHONY: mini-clear-intermediate
+mini-clear-intermediate: ##@minikube deletes all intermediate docker images on minikube k8s cluster
 	@eval $$(minikube docker-env) ;\
 	docker rmi -f $$(docker images --filter dangling=true -q)
 
@@ -66,5 +65,13 @@ test-undeploy: ##@dev unddeploys a test example
 	kubectl delete -f kubernetes/example/namespace.yaml
 
 .PHONY: test
-test: ##@QA runs all (go) test
+test: ##@testing runs all go tests
 	go test ./pkg/
+
+.PHONY: run
+run: 
+	go run main.go -sslCert "./certs/ssl-cert.pem" -sslKey "./certs/ssl-key.pem"
+
+.PHONY: run-no-tls
+run-no-tls: 
+	go run main.go -tlsDisabled true
