@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var singeContainerPodTests = []struct {
+var singleContainerPodTests = []struct {
 	in  []Container
 	out []Patch
 }{
@@ -269,7 +269,7 @@ var multiContainerPodTests = []struct {
 }
 
 func TestPodPatches(t *testing.T) {
-	for i, tt := range singeContainerPodTests {
+	for i, tt := range singleContainerPodTests {
 		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
 			r := podPatches(tt.in, "1G", "0.5", "1G", "0.1")
 			if !reflect.DeepEqual(r, tt.out) {
