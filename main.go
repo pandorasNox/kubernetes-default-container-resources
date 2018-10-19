@@ -22,12 +22,20 @@ func main() {
 	sslKey := flag.String("sslKey", "/certs/ssl-key.pem", "address to bind to")
 	flag.Parse()
 
-	fmt.Printf("tls is: %t\n", !*tlsDisabled)
+	if *tlsDisabled {
+		fmt.Println("tls is disabled")
+	} else {
+		fmt.Println("tls is enabled")
+	}
+	fmt.Printf("expected to listen on addr: %s\n", *addr)
+	fmt.Printf(
+		"default resource values\n limitMemory: %s\n limitCPU: %s\n requestMemory: %s\n requestCPU: %s\n",
+		*limitMemory, *limitCPU, *requestMemory, *requestCPU)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		err := webhook.Mutate(w, r, *limitMemory, *limitCPU, *requestMemory, *requestCPU)
 		if err != nil {
-			log.Println(err)
+			log.Printf("mutation failed: %s", err)
 		}
 	})
 
@@ -35,7 +43,7 @@ func main() {
 		Addr: *addr,
 	}
 	if *tlsDisabled {
-		log.Fatal(server.ListenAndServe())
+		log.Fatalf("server stop because: %s", server.ListenAndServe())
 	}
 
 	server.TLSConfig = &tls.Config{
@@ -50,5 +58,5 @@ func main() {
 			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 		},
 	}
-	log.Fatal(server.ListenAndServeTLS(*sslCert, *sslKey))
+	log.Fatalf("tls server stop because: %s", server.ListenAndServeTLS(*sslCert, *sslKey))
 }
