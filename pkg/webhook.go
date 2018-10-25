@@ -45,44 +45,9 @@ type AdmissionStatus struct {
 	Code    int    `json:"code,omitempty"`
 }
 
-// AdmissionResponse wrapper for the incomming response from kubernetes
-type AdmissionResponse struct {
-	Kind    string `json:"kind"`
-	Request struct {
-		UID    string
-		Object struct {
-			Spec struct {
-				Containers []Container
-			}
-		}
-	}
-}
-
-// IncomingAdmissionReview is a wrapper for the incomming Review from kubernetes
-type IncomingAdmissionReview struct {
-	Kind    string `json:"kind"`
-	Request v1beta1.AdmissionRequest
-}
-
-// Container representation for kubernetesyaml/json container definition
-type Container struct {
-	Resources ComputeResources
-}
-
-// ComputeResources representation for kubernetes yaml/json compute resource definition
-type ComputeResources struct {
-	Limits   ComputeUnit `json:"limits,omitempty"`
-	Requests ComputeUnit `json:"requests,omitempty"`
-}
-
-// ComputeUnit representation for kubernetes yaml/json single compute resource definition
-type ComputeUnit struct {
-	CPU    string `json:"cpu,omitempty"`
-	Memory string `json:"memory,omitempty"`
-}
-
 func prettyPrint(i interface{}) string {
-	s, _ := json.MarshalIndent(i, "", "\t")
+	// s, _ := json.MarshalIndent(i, "", "\t")
+	s, _ := json.Marshal(i)
 	return string(s)
 }
 
@@ -98,12 +63,6 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 	}
 	// fmt.Printf("show k8s incomingAdmissionReview: %s", prettyPrint(incomingAdmissionReview))
 
-	// admissionResponse := &AdmissionResponse{}
-	// err = json.NewDecoder(r.Body).Decode(admissionResponse)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to decode body: %s", err)
-	// }
-
 	raw := incomingAdmissionReview.Request.Object.Raw
 	pod := v1.Pod{}
 	if err := json.Unmarshal(raw, &pod); err != nil {
@@ -111,8 +70,6 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 
 	}
 
-	// containers := admissionResponse.Request.Object.Spec.Containers
-	// requestUID := admissionResponse.Request.UID
 	containers := pod.Spec.Containers
 	requestUID := incomingAdmissionReview.Request.UID
 	admissionReview, err := admissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
@@ -207,11 +164,25 @@ func containerPatches(index int, cr v1.ResourceRequirements, memoryLimit, CPULim
 	//keep original demanded compute values
 	if !isMemoryEmpty(cr) {
 		patchValue.Limits[v1.ResourceMemory] = cr.Limits[v1.ResourceMemory]
+		if !mapKeyExist(cr.Limits, v1.ResourceMemory) {
+			delete(patchValue.Limits, v1.ResourceMemory)
+		}
+
 		patchValue.Requests[v1.ResourceMemory] = cr.Requests[v1.ResourceMemory]
+		if !mapKeyExist(cr.Requests, v1.ResourceMemory) {
+			delete(patchValue.Requests, v1.ResourceMemory)
+		}
 	}
 	if !isCPUEmpty(cr) {
 		patchValue.Limits[v1.ResourceCPU] = cr.Limits[v1.ResourceCPU]
+		if !mapKeyExist(cr.Limits, v1.ResourceCPU) {
+			delete(patchValue.Limits, v1.ResourceCPU)
+		}
+
 		patchValue.Requests[v1.ResourceCPU] = cr.Requests[v1.ResourceCPU]
+		if !mapKeyExist(cr.Requests, v1.ResourceCPU) {
+			delete(patchValue.Requests, v1.ResourceCPU)
+		}
 	}
 
 	patches = append(patches, createPatch(
@@ -232,11 +203,11 @@ func memoryAndCPUPairExists(cr v1.ResourceRequirements) bool {
 }
 
 func isMemoryEmpty(cr v1.ResourceRequirements) bool {
-	return mapKeyExist(cr.Limits, v1.ResourceMemory) && mapKeyExist(cr.Requests, v1.ResourceMemory)
+	return !mapKeyExist(cr.Limits, v1.ResourceMemory) && !mapKeyExist(cr.Requests, v1.ResourceMemory)
 }
 
-func mapKeyExist(rq v1.ResourceList, key v1.ResourceName) bool {
-	if _, ok := rq[key]; ok {
+func mapKeyExist(rl v1.ResourceList, key v1.ResourceName) bool {
+	if _, keyExist := rl[key]; keyExist {
 		return true
 	}
 
@@ -244,7 +215,7 @@ func mapKeyExist(rq v1.ResourceList, key v1.ResourceName) bool {
 }
 
 func isCPUEmpty(cr v1.ResourceRequirements) bool {
-	return mapKeyExist(cr.Limits, v1.ResourceCPU) && mapKeyExist(cr.Requests, v1.ResourceCPU)
+	return !mapKeyExist(cr.Limits, v1.ResourceCPU) && !mapKeyExist(cr.Requests, v1.ResourceCPU)
 }
 
 func createPatch(op string, index int, containerSubPath, value interface{}) Patch {
