@@ -206,16 +206,16 @@ func isMemoryEmpty(cr v1.ResourceRequirements) bool {
 	return !mapKeyExist(cr.Limits, v1.ResourceMemory) && !mapKeyExist(cr.Requests, v1.ResourceMemory)
 }
 
+func isCPUEmpty(cr v1.ResourceRequirements) bool {
+	return !mapKeyExist(cr.Limits, v1.ResourceCPU) && !mapKeyExist(cr.Requests, v1.ResourceCPU)
+}
+
 func mapKeyExist(rl v1.ResourceList, key v1.ResourceName) bool {
 	if _, keyExist := rl[key]; keyExist {
 		return true
 	}
 
 	return false
-}
-
-func isCPUEmpty(cr v1.ResourceRequirements) bool {
-	return !mapKeyExist(cr.Limits, v1.ResourceCPU) && !mapKeyExist(cr.Requests, v1.ResourceCPU)
 }
 
 func createPatch(op string, index int, containerSubPath, value interface{}) Patch {
