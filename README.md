@@ -79,3 +79,6 @@ kubectl -n foo patch pod pod-with-resources --type json -p='[{"op": "add","path"
 
 ### usefull tools
 - https://json-patch-builder-online.github.io/
+
+### resources
+- https://github.com/caesarxuchao/example-webhook-admission-controller/blob/master/main.go#L53
