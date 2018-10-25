@@ -66,7 +66,7 @@ test-undeploy: ##@dev unddeploys a test example
 
 .PHONY: test
 test: ##@testing runs all go tests
-	go test ./pkg/
+	go test -v ./pkg/
 
 .PHONY: run
 run: 
