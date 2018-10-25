@@ -1,7 +1,6 @@
 package webhook
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,36 +12,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// AdmissionReview is a validation/mutation object readable by the kubernetes api server.
-type AdmissionReview struct {
-	Response AdmissionReviewResponse `json:"response"`
-}
-
-// AdmissionReviewResponse is the response wrapper object for the AdmissionReview.
-type AdmissionReviewResponse struct {
-	UID       types.UID       `json:"uid"`
-	Allowed   bool            `json:"allowed"`
-	Status    AdmissionStatus `json:"status,omitempty"`
-	Patch     base64String    `json:"patch"`
-	PatchType string          `json:"patchType"`
-}
-
-type base64String string
-
 // Patch represents a single JSONPatch operation
 // @see http://jsonpatch.com/
 type Patch struct {
 	Op    string      `json:"op"`
 	Path  string      `json:"path"`
 	Value interface{} `json:"value"`
-}
-
-// AdmissionStatus JSON/struct wrapper for the status field of the AdmissionReviewResponse
-type AdmissionStatus struct {
-	Status  string `json:"status,omitempty"`
-	Message string `json:"message,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Code    int    `json:"code,omitempty"`
 }
 
 func prettyPrint(i interface{}) string {
@@ -55,7 +30,6 @@ func prettyPrint(i interface{}) string {
 func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 	requestMemory, requestCPU string) error {
 
-	// incomingAdmissionReview := &IncomingAdmissionReview{}
 	incomingAdmissionReview := &v1beta1.AdmissionReview{}
 	err := json.NewDecoder(r.Body).Decode(incomingAdmissionReview)
 	if err != nil {
@@ -72,16 +46,16 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 
 	containers := pod.Spec.Containers
 	requestUID := incomingAdmissionReview.Request.UID
-	admissionReview, err := admissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
+	outgoingAdmissionReview, err := admissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
 	if err != nil {
-		return fmt.Errorf("failed to get admissionReview: %s", err)
+		return fmt.Errorf("failed to get outgoingAdmissionReview: %s", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(admissionReview)
+	err = json.NewEncoder(w).Encode(outgoingAdmissionReview)
 	if err != nil {
-		// failed to encode admissionReview into header???
+		// failed to encode outgoingAdmissionReview into header???
 		return fmt.Errorf("failed to send response: %s", err)
 	}
 
@@ -89,22 +63,23 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 }
 
 func admissionReview(containers []v1.Container, UID types.UID, memoryLimit, CPULimit, memoryRequest,
-	CPURequest string) (AdmissionReview, error) {
+	CPURequest string) (v1beta1.AdmissionReview, error) {
 
 	patches, err := podPatches(containers, memoryLimit, CPULimit, memoryRequest, CPURequest)
 	//todo: handle err
 
 	jsonPatch, err := json.Marshal(patches)
 	if err != nil {
-		return AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
+		return v1beta1.AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
 	}
 
-	return AdmissionReview{
-		AdmissionReviewResponse{
+	patchType := v1beta1.PatchTypeJSONPatch
+	return v1beta1.AdmissionReview{
+		Response: &v1beta1.AdmissionResponse{
 			UID:       UID,
 			Allowed:   true,
-			Patch:     base64String(base64.StdEncoding.EncodeToString(jsonPatch)),
-			PatchType: "JSONPatch",
+			Patch:     []byte(jsonPatch),
+			PatchType: &patchType,
 		},
 	}, nil
 }
