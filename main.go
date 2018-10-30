@@ -4,37 +4,56 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"fmt"
-	"log"
 	"net/http"
+	"os"
+
+	"log"
 
 	"github.com/pandorasnox/kubernetes-default-container-resources/pkg"
+	"github.com/sirupsen/logrus"
 )
+
+func init() {
+	// Log as JSON instead of the default ASCII formatter.
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+
+	// Output to stdout instead of the default stderr
+	// Can be any io.Writer, see below for File example
+	logrus.SetOutput(os.Stdout)
+
+	// Only log the warning severity or above.
+	// log.SetLevel(log.WarnLevel)
+}
 
 func main() {
 	tlsDisabled := flag.Bool("tlsDisabled", false, "disabled tls for the server")
 	limitMemory := flag.String("limitMemory", "1G", "memory limit (default 1G)")
 	limitCPU := flag.String("limitCPU", "0.5", "cpu limit (default 0.5 cores)")
-	requestMemory := flag.String("requestMemory", "1G", "memory request (default 1G)")
-	requestCPU := flag.String("requestCPU", "0.1", "cpu request (default 0.1 cores)")
+	requestMemory := flag.String("requestMemory", "512M", "memory request (default 1G)")
+	requestCPU := flag.String("requestCPU", "0.05", "cpu request (default 0.1 cores)")
 	addr := flag.String("addr", ":8083", "address to bind to")
 	sslCert := flag.String("sslCert", "/certs/ssl-cert.pem", "address to bind to")
 	sslKey := flag.String("sslKey", "/certs/ssl-key.pem", "address to bind to")
 	flag.Parse()
 
-	if *tlsDisabled {
-		fmt.Println("tls is disabled")
-	} else {
-		fmt.Println("tls is enabled")
+	logrus.WithFields(logrus.Fields{
+		"tlsDisabled":   *tlsDisabled,
+		"addr":          *addr,
+		"limitMemory":   *limitMemory,
+		"limitCPU":      *limitCPU,
+		"requestMemory": *requestMemory,
+		"requestCPU":    *requestCPU,
+	}).Info("log programm flags")
+
+	defaultResourceRequirements, err := webhook.ParseResourceRequirements(*limitMemory, *limitCPU, *requestMemory, *requestCPU)
+	if err != nil {
+		log.Fatalf("could not parse resource requirements based on program flags: %s", err)
 	}
-	fmt.Printf("expected to listen on addr: %s\n", *addr)
-	fmt.Printf(
-		"default resource values\n limitMemory: %s\n limitCPU: %s\n requestMemory: %s\n requestCPU: %s\n",
-		*limitMemory, *limitCPU, *requestMemory, *requestCPU)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := webhook.Mutate(w, r, *limitMemory, *limitCPU, *requestMemory, *requestCPU)
+		err := webhook.Mutate(w, r, defaultResourceRequirements)
 		if err != nil {
+			//todo: use "Fatalf" instead of "Printf"???
 			log.Printf("mutation failed: %s", err)
 		}
 	})

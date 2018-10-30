@@ -9,9 +9,11 @@ after that, to change permissions ... run:
 
 ## test local
 ### deps
- `cd $GOPATH/src/k8s.io/api/admission/v1beta1`
- `go get`
+```
+cd $GOPATH/src/k8s.io/api/admission/v1beta1
 
+go get
+```
 
 ###
 without resources

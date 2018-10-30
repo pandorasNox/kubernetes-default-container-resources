@@ -14,6 +14,8 @@ var limitCPU = "0.5"
 var requestMemory = "1G"
 var requestCPU = "0.1"
 
+var defaultResourceRequirements, _ = ParseResourceRequirements(limitMemory, limitCPU, requestMemory, requestCPU)
+
 func getResourceQuantity(quantity string) resource.Quantity {
 	resDef, _ := resource.ParseQuantity(quantity)
 	return resDef
@@ -33,16 +35,12 @@ var singleContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/0/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.1",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -53,8 +51,7 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
 					},
 				},
 			},
@@ -63,14 +60,11 @@ var singleContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/0/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// CPU:    "0.1",
-						v1.ResourceCPU: getResourceQuantity(requestCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -81,8 +75,7 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
 					},
 				},
 			},
@@ -91,14 +84,11 @@ var singleContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/0/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// CPU:    "0.5",
-						v1.ResourceCPU: getResourceQuantity(limitCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.1",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -109,8 +99,7 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// CPU: "0.5",
-						v1.ResourceCPU: getResourceQuantity(limitCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 				},
 			},
@@ -119,14 +108,11 @@ var singleContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/0/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
 					},
 				},
 			},
@@ -137,10 +123,8 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 				},
 			},
@@ -152,10 +136,8 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -167,12 +149,10 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
 					},
 					Requests: v1.ResourceList{
-						// CPU: "0.1",
-						v1.ResourceCPU: getResourceQuantity(requestCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -184,12 +164,10 @@ var singleContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// CPU: "0.5",
-						v1.ResourceCPU: getResourceQuantity(limitCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
 					},
 				},
 			},
@@ -215,32 +193,24 @@ var multiContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/0/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.1",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
 			Patch{"replace", "/spec/containers/1/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.1",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -251,12 +221,10 @@ var multiContainerPodTests = []struct {
 			v1.Container{
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// CPU: "0.5",
-						v1.ResourceCPU: getResourceQuantity(limitCPU),
+						v1.ResourceCPU: defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
 					},
 				},
 			},
@@ -268,16 +236,12 @@ var multiContainerPodTests = []struct {
 			Patch{"replace", "/spec/containers/1/resources",
 				v1.ResourceRequirements{
 					Limits: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.5",
-						v1.ResourceMemory: getResourceQuantity(limitMemory),
-						v1.ResourceCPU:    getResourceQuantity(limitCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Limits[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Limits[v1.ResourceCPU],
 					},
 					Requests: v1.ResourceList{
-						// Memory: "1G",
-						// CPU:    "0.1",
-						v1.ResourceMemory: getResourceQuantity(requestMemory),
-						v1.ResourceCPU:    getResourceQuantity(requestCPU),
+						v1.ResourceMemory: defaultResourceRequirements.Requests[v1.ResourceMemory],
+						v1.ResourceCPU:    defaultResourceRequirements.Requests[v1.ResourceCPU],
 					},
 				},
 			},
@@ -288,7 +252,7 @@ var multiContainerPodTests = []struct {
 func TestSingleContainerPodPatches(t *testing.T) {
 	for i, tt := range singleContainerPodTests {
 		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
-			r, _ := podPatches(tt.in, limitMemory, limitCPU, requestMemory, requestCPU)
+			r, _ := podPatches(tt.in, defaultResourceRequirements)
 			// if !reflect.DeepEqual(r, tt.out) {
 			// 	t.Errorf("got %q, want %q", r, tt.out)
 			// }
@@ -302,7 +266,7 @@ func TestSingleContainerPodPatches(t *testing.T) {
 func TestMultiContainerPodPatches(t *testing.T) {
 	for i, tt := range multiContainerPodTests {
 		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
-			r, _ := podPatches(tt.in, limitMemory, limitCPU, requestMemory, requestCPU)
+			r, _ := podPatches(tt.in, defaultResourceRequirements)
 			if !reflect.DeepEqual(r, tt.out) {
 				t.Errorf("got %q, want %q", r, tt.out)
 			}

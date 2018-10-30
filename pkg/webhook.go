@@ -26,9 +26,41 @@ func prettyPrint(i interface{}) string {
 	return string(s)
 }
 
+//ParseResourceRequirements parses string resource representations to ResourceRequirements
+func ParseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
+	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryLimit quanttiy: %s", err)
+	}
+	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPULimit quanttiy: %s", err)
+	}
+	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryRequest quanttiy: %s", err)
+	}
+	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPURequest quanttiy: %s", err)
+	}
+
+	resourceRequirements := v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryLimit,
+			v1.ResourceCPU:    defaultCPULimit,
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryRequest,
+			v1.ResourceCPU:    defaultCPURequest,
+		},
+	}
+
+	return resourceRequirements, nil
+}
+
 // Mutate responds to kubernetes webhooks request to add resource limits.
-func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
-	requestMemory, requestCPU string) error {
+func Mutate(w http.ResponseWriter, r *http.Request, defaultResourceRequirements v1.ResourceRequirements) error {
 
 	incomingAdmissionReview := &v1beta1.AdmissionReview{}
 	err := json.NewDecoder(r.Body).Decode(incomingAdmissionReview)
@@ -46,7 +78,7 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 
 	containers := pod.Spec.Containers
 	requestUID := incomingAdmissionReview.Request.UID
-	outgoingAdmissionReview, err := admissionReview(containers, requestUID, limitMemory, limitCPU, requestMemory, requestCPU)
+	outgoingAdmissionReview, err := admissionReview(containers, requestUID, defaultResourceRequirements)
 	if err != nil {
 		return fmt.Errorf("failed to get outgoingAdmissionReview: %s", err)
 	}
@@ -55,18 +87,18 @@ func Mutate(w http.ResponseWriter, r *http.Request, limitMemory, limitCPU,
 	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(outgoingAdmissionReview)
 	if err != nil {
-		// failed to encode outgoingAdmissionReview into header???
-		return fmt.Errorf("failed to send response: %s", err)
+		return fmt.Errorf("failed to encode outgoingAdmissionReview and send response: %s", err)
 	}
 
 	return nil
 }
 
-func admissionReview(containers []v1.Container, UID types.UID, memoryLimit, CPULimit, memoryRequest,
-	CPURequest string) (v1beta1.AdmissionReview, error) {
+func admissionReview(containers []v1.Container, UID types.UID, defaultRR v1.ResourceRequirements) (v1beta1.AdmissionReview, error) {
 
-	patches, err := podPatches(containers, memoryLimit, CPULimit, memoryRequest, CPURequest)
-	//todo: handle err
+	patches, err := podPatches(containers, defaultRR)
+	if err != nil {
+		return v1beta1.AdmissionReview{}, fmt.Errorf("failed to get patches for pod: %s", err)
+	}
 
 	jsonPatch, err := json.Marshal(patches)
 	if err != nil {
@@ -84,11 +116,10 @@ func admissionReview(containers []v1.Container, UID types.UID, memoryLimit, CPUL
 	}, nil
 }
 
-func podPatches(containers []v1.Container, memoryLimit, CPULimit, memoryRequest,
-	CPURequest string) ([]Patch, error) {
+func podPatches(containers []v1.Container, defaultRR v1.ResourceRequirements) ([]Patch, error) {
 	patches := []Patch{}
 	for i, c := range containers {
-		containerPatches, err := containerPatches(i, c.Resources, memoryLimit, CPULimit, memoryRequest, CPURequest)
+		containerPatches, err := containerPatches(i, c.Resources, defaultRR)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get containerPatches: %s", err)
 		}
@@ -100,63 +131,43 @@ func podPatches(containers []v1.Container, memoryLimit, CPULimit, memoryRequest,
 	return patches, nil
 }
 
-func containerPatches(index int, cr v1.ResourceRequirements, memoryLimit, CPULimit, memoryRequest,
-	CPURequest string) ([]Patch, error) {
+func containerPatches(index int, containerRR v1.ResourceRequirements, defaultRR v1.ResourceRequirements) ([]Patch, error) {
 	patches := []Patch{}
 
-	if memoryAndCPUPairExists(cr) {
+	if memoryAndCPUPairExists(containerRR) {
 		return patches, nil
 	}
 
-	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse memoryLimit quanttiy: %s", err)
-	}
-	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CPULimit quanttiy: %s", err)
-	}
-	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse memoryRequest quanttiy: %s", err)
-	}
-	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse CPURequest quanttiy: %s", err)
-	}
-
 	patchValue := v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryLimit,
-			v1.ResourceCPU:    defaultCPULimit,
-		},
-		Requests: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryRequest,
-			v1.ResourceCPU:    defaultCPURequest,
-		},
+		Limits:   v1.ResourceList{},
+		Requests: v1.ResourceList{},
 	}
 
 	//keep original demanded compute values
-	if !isMemoryEmpty(cr) {
-		patchValue.Limits[v1.ResourceMemory] = cr.Limits[v1.ResourceMemory]
-		if !mapKeyExist(cr.Limits, v1.ResourceMemory) {
-			delete(patchValue.Limits, v1.ResourceMemory)
+	if isMemoryEmpty(containerRR) {
+		patchValue.Limits[v1.ResourceMemory] = defaultRR.Limits[v1.ResourceMemory]
+		patchValue.Requests[v1.ResourceMemory] = defaultRR.Requests[v1.ResourceMemory]
+	} else {
+		v, ok := containerRR.Limits[v1.ResourceMemory]
+		if ok {
+			patchValue.Limits[v1.ResourceMemory] = v
 		}
-
-		patchValue.Requests[v1.ResourceMemory] = cr.Requests[v1.ResourceMemory]
-		if !mapKeyExist(cr.Requests, v1.ResourceMemory) {
-			delete(patchValue.Requests, v1.ResourceMemory)
+		v, ok = containerRR.Requests[v1.ResourceMemory]
+		if ok {
+			patchValue.Requests[v1.ResourceMemory] = v
 		}
 	}
-	if !isCPUEmpty(cr) {
-		patchValue.Limits[v1.ResourceCPU] = cr.Limits[v1.ResourceCPU]
-		if !mapKeyExist(cr.Limits, v1.ResourceCPU) {
-			delete(patchValue.Limits, v1.ResourceCPU)
+	if isCPUEmpty(containerRR) {
+		patchValue.Limits[v1.ResourceCPU] = defaultRR.Limits[v1.ResourceCPU]
+		patchValue.Requests[v1.ResourceCPU] = defaultRR.Requests[v1.ResourceCPU]
+	} else {
+		v, ok := containerRR.Limits[v1.ResourceCPU]
+		if ok {
+			patchValue.Limits[v1.ResourceCPU] = v
 		}
-
-		patchValue.Requests[v1.ResourceCPU] = cr.Requests[v1.ResourceCPU]
-		if !mapKeyExist(cr.Requests, v1.ResourceCPU) {
-			delete(patchValue.Requests, v1.ResourceCPU)
+		v, ok = containerRR.Requests[v1.ResourceCPU]
+		if ok {
+			patchValue.Requests[v1.ResourceCPU] = v
 		}
 	}
 
@@ -170,19 +181,19 @@ func containerPatches(index int, cr v1.ResourceRequirements, memoryLimit, CPULim
 	return patches, nil
 }
 
-func memoryAndCPUPairExists(cr v1.ResourceRequirements) bool {
-	return (mapKeyExist(cr.Limits, v1.ResourceMemory) && mapKeyExist(cr.Limits, v1.ResourceCPU)) ||
-		(mapKeyExist(cr.Requests, v1.ResourceMemory) && mapKeyExist(cr.Requests, v1.ResourceCPU)) ||
-		(mapKeyExist(cr.Limits, v1.ResourceMemory) && mapKeyExist(cr.Requests, v1.ResourceCPU)) ||
-		(mapKeyExist(cr.Requests, v1.ResourceMemory) && mapKeyExist(cr.Limits, v1.ResourceCPU))
+func memoryAndCPUPairExists(rr v1.ResourceRequirements) bool {
+	return (mapKeyExist(rr.Limits, v1.ResourceMemory) && mapKeyExist(rr.Limits, v1.ResourceCPU)) ||
+		(mapKeyExist(rr.Requests, v1.ResourceMemory) && mapKeyExist(rr.Requests, v1.ResourceCPU)) ||
+		(mapKeyExist(rr.Limits, v1.ResourceMemory) && mapKeyExist(rr.Requests, v1.ResourceCPU)) ||
+		(mapKeyExist(rr.Requests, v1.ResourceMemory) && mapKeyExist(rr.Limits, v1.ResourceCPU))
 }
 
-func isMemoryEmpty(cr v1.ResourceRequirements) bool {
-	return !mapKeyExist(cr.Limits, v1.ResourceMemory) && !mapKeyExist(cr.Requests, v1.ResourceMemory)
+func isMemoryEmpty(rr v1.ResourceRequirements) bool {
+	return !mapKeyExist(rr.Limits, v1.ResourceMemory) && !mapKeyExist(rr.Requests, v1.ResourceMemory)
 }
 
-func isCPUEmpty(cr v1.ResourceRequirements) bool {
-	return !mapKeyExist(cr.Limits, v1.ResourceCPU) && !mapKeyExist(cr.Requests, v1.ResourceCPU)
+func isCPUEmpty(rr v1.ResourceRequirements) bool {
+	return !mapKeyExist(rr.Limits, v1.ResourceCPU) && !mapKeyExist(rr.Requests, v1.ResourceCPU)
 }
 
 func mapKeyExist(rl v1.ResourceList, key v1.ResourceName) bool {
