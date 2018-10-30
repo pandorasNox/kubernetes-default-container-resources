@@ -22,10 +22,12 @@ func getResourceQuantity(quantity string) resource.Quantity {
 }
 
 var singleContainerPodTests = []struct {
-	in  []v1.Container
-	out []Patch
+	name string
+	in   []v1.Container
+	out  []Patch
 }{
 	{
+		"container without ResourceRequirements",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{},
@@ -47,6 +49,7 @@ var singleContainerPodTests = []struct {
 		},
 	},
 	{
+		"container with limited memory",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -71,6 +74,7 @@ var singleContainerPodTests = []struct {
 		},
 	},
 	{
+		"container with requested memory",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -95,6 +99,7 @@ var singleContainerPodTests = []struct {
 		},
 	},
 	{
+		"container with limited cpu",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -119,6 +124,7 @@ var singleContainerPodTests = []struct {
 		},
 	},
 	{
+		"container with limited memory and cpu",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -132,6 +138,7 @@ var singleContainerPodTests = []struct {
 		[]Patch{},
 	},
 	{
+		"container with requested memory and cpu",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -145,6 +152,7 @@ var singleContainerPodTests = []struct {
 		[]Patch{},
 	},
 	{
+		"container with limited memory & requested cpu",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -160,6 +168,7 @@ var singleContainerPodTests = []struct {
 		[]Patch{},
 	},
 	{
+		"container with limited cpu & requested memory",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -177,10 +186,12 @@ var singleContainerPodTests = []struct {
 }
 
 var multiContainerPodTests = []struct {
-	in  []v1.Container
-	out []Patch
+	name string
+	in   []v1.Container
+	out  []Patch
 }{
 	{
+		"two container without ResourceRequirements",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{},
@@ -217,6 +228,7 @@ var multiContainerPodTests = []struct {
 		},
 	},
 	{
+		"fst container with limited cpu and requested memory, snd container without ResourceRequirements",
 		[]v1.Container{
 			v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -251,7 +263,7 @@ var multiContainerPodTests = []struct {
 
 func TestSingleContainerPodPatches(t *testing.T) {
 	for i, tt := range singleContainerPodTests {
-		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
+		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
 			r, _ := podPatches(tt.in, defaultResourceRequirements)
 			// if !reflect.DeepEqual(r, tt.out) {
 			// 	t.Errorf("got %q, want %q", r, tt.out)
@@ -265,7 +277,7 @@ func TestSingleContainerPodPatches(t *testing.T) {
 
 func TestMultiContainerPodPatches(t *testing.T) {
 	for i, tt := range multiContainerPodTests {
-		t.Run(""+strconv.Itoa(i), func(t *testing.T) {
+		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
 			r, _ := podPatches(tt.in, defaultResourceRequirements)
 			if !reflect.DeepEqual(r, tt.out) {
 				t.Errorf("got %q, want %q", r, tt.out)
