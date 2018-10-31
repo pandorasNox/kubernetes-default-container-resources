@@ -43,26 +43,22 @@ func (c ComplementMemOrCPU) Patches(index int, containerRR k8s_v1.ResourceRequir
 		patchValue.Limits[k8s_v1.ResourceMemory] = defaultRR.Limits[k8s_v1.ResourceMemory]
 		patchValue.Requests[k8s_v1.ResourceMemory] = defaultRR.Requests[k8s_v1.ResourceMemory]
 	} else {
-		v, ok := containerRR.Limits[k8s_v1.ResourceMemory]
-		if ok {
-			patchValue.Limits[k8s_v1.ResourceMemory] = v
+		if mapKeyExist(containerRR.Limits, k8s_v1.ResourceMemory) {
+			patchValue.Limits[k8s_v1.ResourceMemory] = containerRR.Limits[k8s_v1.ResourceMemory]
 		}
-		v, ok = containerRR.Requests[k8s_v1.ResourceMemory]
-		if ok {
-			patchValue.Requests[k8s_v1.ResourceMemory] = v
+		if mapKeyExist(containerRR.Requests, k8s_v1.ResourceMemory) {
+			patchValue.Requests[k8s_v1.ResourceMemory] = containerRR.Requests[k8s_v1.ResourceMemory]
 		}
 	}
 	if isCPUEmpty(containerRR) {
 		patchValue.Limits[k8s_v1.ResourceCPU] = defaultRR.Limits[k8s_v1.ResourceCPU]
 		patchValue.Requests[k8s_v1.ResourceCPU] = defaultRR.Requests[k8s_v1.ResourceCPU]
 	} else {
-		v, ok := containerRR.Limits[k8s_v1.ResourceCPU]
-		if ok {
-			patchValue.Limits[k8s_v1.ResourceCPU] = v
+		if mapKeyExist(containerRR.Limits, k8s_v1.ResourceCPU) {
+			patchValue.Limits[k8s_v1.ResourceCPU] = containerRR.Limits[k8s_v1.ResourceCPU]
 		}
-		v, ok = containerRR.Requests[k8s_v1.ResourceCPU]
-		if ok {
-			patchValue.Requests[k8s_v1.ResourceCPU] = v
+		if mapKeyExist(containerRR.Requests, k8s_v1.ResourceCPU) {
+			patchValue.Requests[k8s_v1.ResourceCPU] = containerRR.Requests[k8s_v1.ResourceCPU]
 		}
 	}
 
