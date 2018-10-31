@@ -264,9 +264,11 @@ var multiContainerPodTests = []struct {
 }
 
 func TestSingleContainerPodPatches(t *testing.T) {
+	patchStrategy := container.ComplementMemOrCPU{}
+
 	for i, tt := range singleContainerPodTests {
 		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
-			r, _ := podPatches(tt.in, defaultResourceRequirements)
+			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
 			// if !reflect.DeepEqual(r, tt.out) {
 			// 	t.Errorf("got %q, want %q", r, tt.out)
 			// }
@@ -278,9 +280,11 @@ func TestSingleContainerPodPatches(t *testing.T) {
 }
 
 func TestMultiContainerPodPatches(t *testing.T) {
+	patchStrategy := container.ComplementMemOrCPU{}
+
 	for i, tt := range multiContainerPodTests {
 		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
-			r, _ := podPatches(tt.in, defaultResourceRequirements)
+			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
 			if !reflect.DeepEqual(r, tt.out) {
 				t.Errorf("got %q, want %q", r, tt.out)
 			}
