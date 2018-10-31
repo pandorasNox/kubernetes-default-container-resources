@@ -6,25 +6,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pandorasnox/kubernetes-default-container-resources/pkg/container"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-// Patch represents a single JSONPatch operation
-// @see http://jsonpatch.com/
-type Patch struct {
-	Op    string      `json:"op"`
-	Path  string      `json:"path"`
-	Value interface{} `json:"value"`
-}
-
-func prettyPrint(i interface{}) string {
-	// s, _ := json.MarshalIndent(i, "", "\t")
-	s, _ := json.Marshal(i)
-	return string(s)
-}
 
 //ParseResourceRequirements parses string resource representations to ResourceRequirements
 func ParseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
@@ -67,7 +54,6 @@ func Mutate(w http.ResponseWriter, r *http.Request, defaultResourceRequirements 
 	if err != nil {
 		return fmt.Errorf("failed to decode body: %s", err)
 	}
-	// fmt.Printf("show k8s incomingAdmissionReview: %s", prettyPrint(incomingAdmissionReview))
 
 	raw := incomingAdmissionReview.Request.Object.Raw
 	pod := v1.Pod{}
@@ -116,8 +102,8 @@ func admissionReview(containers []v1.Container, UID types.UID, defaultRR v1.Reso
 	}, nil
 }
 
-func podPatches(containers []v1.Container, defaultRR v1.ResourceRequirements) ([]Patch, error) {
-	patches := []Patch{}
+func podPatches(containers []v1.Container, defaultRR v1.ResourceRequirements) ([]container.Patch, error) {
+	patches := []container.Patch{}
 	for i, c := range containers {
 		containerPatches, err := containerPatches(i, c.Resources, defaultRR)
 		if err != nil {
@@ -131,8 +117,8 @@ func podPatches(containers []v1.Container, defaultRR v1.ResourceRequirements) ([
 	return patches, nil
 }
 
-func containerPatches(index int, containerRR v1.ResourceRequirements, defaultRR v1.ResourceRequirements) ([]Patch, error) {
-	patches := []Patch{}
+func containerPatches(index int, containerRR v1.ResourceRequirements, defaultRR v1.ResourceRequirements) ([]container.Patch, error) {
+	patches := []container.Patch{}
 
 	if memoryAndCPUPairExists(containerRR) {
 		return patches, nil
@@ -204,8 +190,8 @@ func mapKeyExist(rl v1.ResourceList, key v1.ResourceName) bool {
 	return false
 }
 
-func createPatch(op string, index int, containerSubPath, value interface{}) Patch {
-	return Patch{
+func createPatch(op string, index int, containerSubPath, value interface{}) container.Patch {
+	return container.Patch{
 		Op:    op,
 		Path:  strings.TrimRight(fmt.Sprintf("/spec/containers/%d/%s", index, containerSubPath), "/"),
 		Value: value,

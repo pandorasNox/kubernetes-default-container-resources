@@ -79,6 +79,12 @@ pod without resources
 kubectl -n foo patch pod pod-with-resources --type json -p='[{"op": "add","path": "/spec/containers/0/resources/limits/memory","value": "256Mi"}]'
 ```
 
+### patch strategies
+- if only mem is set, patch cpu, if only cpu is set, patch mem (current version, name complement strategy, name: complementMemOrCPU)
+- if something is set, no patch at all (name: defaultOnEmpty)
+- always patch missing values for cpu as well as mem for request (name: alwaysFillToDefault or complementToDefault)
+  - e.g. limit mem => patch limit cpu, patch request cpu and patch request mem to same as limit mem
+
 ### usefull tools
 - https://json-patch-builder-online.github.io/
 
