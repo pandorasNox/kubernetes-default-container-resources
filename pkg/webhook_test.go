@@ -1,296 +1,100 @@
 package webhook
 
 import (
-	"encoding/json"
 	"reflect"
-	"strconv"
 	"testing"
 
-	"github.com/pandorasnox/kubernetes-default-container-resources/pkg/container"
 	k8s_v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 var limitMemory = "1G"
 var limitCPU = "0.5"
-var requestMemory = "512M"
-var requestCPU = "0.05"
+var requestMemory = "1G"
+var requestCPU = "0.1"
 
-var defaultResourceRequirements, _ = ParseResourceRequirements(limitMemory, limitCPU, requestMemory, requestCPU)
+var defaults, _ = ParseResourceRequirements(limitMemory, limitCPU, requestMemory, requestCPU)
 
-func prettyPrint(i interface{}) string {
-	// s, _ := json.MarshalIndent(i, "", "\t")
-	s, _ := json.Marshal(i)
-	return string(s)
-}
-
-var singleContainerPodTests = []struct {
-	name string
-	in   []k8s_v1.Container
-	out  []container.Patch
-}{
-	{
-		"container without ResourceRequirements",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/0/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-	},
-	{
-		"container with limited memory",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-					},
-				},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/0/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-	},
-	{
-		"container with requested memory",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-					},
-				},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/0/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-	},
-	{
-		"container with limited cpu",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/0/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-					},
-				},
-			},
-		},
-	},
-	{
-		"container with limited memory and cpu",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-		[]container.Patch{},
-	},
-	{
-		"container with requested memory and cpu",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-		[]container.Patch{},
-	},
-	{
-		"container with limited memory & requested cpu",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-		[]container.Patch{},
-	},
-	{
-		"container with limited cpu & requested memory",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-					},
-				},
-			},
-		},
-		[]container.Patch{},
-	},
-}
-
-var multiContainerPodTests = []struct {
-	name string
-	in   []k8s_v1.Container
-	out  []container.Patch
-}{
-	{
-		"two container without ResourceRequirements",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{},
-			},
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/0/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-			container.Patch{"replace", "/spec/containers/1/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-	},
-	{
-		"fst container with limited cpu and requested memory snd container without ResourceRequirements",
-		[]k8s_v1.Container{
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceCPU: defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-					},
-				},
-			},
-			k8s_v1.Container{
-				Resources: k8s_v1.ResourceRequirements{},
-			},
-		},
-		[]container.Patch{
-			container.Patch{"replace", "/spec/containers/1/resources",
-				k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
-					},
-					Requests: k8s_v1.ResourceList{
-						k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
-						k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
-					},
-				},
-			},
-		},
-	},
-}
-
-func TestSingleContainerPodPatches(t *testing.T) {
-	patchStrategy := container.ComplementMemOrCPU{}
-
-	for i, tt := range singleContainerPodTests {
-		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
-			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
-			// if !reflect.DeepEqual(r, tt.out) {
-			// 	t.Errorf("got %q, want %q", r, tt.out)
-			// }
-			if prettyPrint(r) != prettyPrint(tt.out) {
-				t.Errorf("got %q, want %q", prettyPrint(r), prettyPrint(tt.out))
-			}
-		})
+func getResourceQuantity(quantity string) resource.Quantity {
+	resDef, err := resource.ParseQuantity(quantity)
+	if err != nil {
+		panic(err)
 	}
+	return resDef
 }
 
-func TestMultiContainerPodPatches(t *testing.T) {
-	patchStrategy := container.ComplementMemOrCPU{}
+func parseTestResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) k8s_v1.ResourceRequirements {
+	r := k8s_v1.ResourceRequirements{
+		Limits:   k8s_v1.ResourceList{},
+		Requests: k8s_v1.ResourceList{},
+	}
 
-	for i, tt := range multiContainerPodTests {
-		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
-			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
-			if !reflect.DeepEqual(r, tt.out) {
-				t.Errorf("got %q, want %q", r, tt.out)
+	if memoryLimit != "" {
+		r.Limits[k8s_v1.ResourceMemory] = getResourceQuantity(memoryLimit)
+	}
+	if CPULimit != "" {
+		r.Limits[k8s_v1.ResourceCPU] = getResourceQuantity(CPULimit)
+	}
+	if memoryRequest != "" {
+		r.Requests[k8s_v1.ResourceMemory] = getResourceQuantity(memoryRequest)
+	}
+	if CPURequest != "" {
+		r.Requests[k8s_v1.ResourceCPU] = getResourceQuantity(CPURequest)
+	}
+
+	return r
+}
+
+func Test_addDefaults(t *testing.T) {
+	type args struct {
+		c k8s_v1.ResourceRequirements
+		d k8s_v1.ResourceRequirements
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    k8s_v1.ResourceRequirements
+		wantErr bool
+	}{
+		{
+			name: "empty sets defaults",
+			args: args{
+				c: k8s_v1.ResourceRequirements{
+					Limits:   k8s_v1.ResourceList{},
+					Requests: k8s_v1.ResourceList{},
+				},
+				d: defaults,
+			},
+			want: defaults,
+		},
+		{
+			name: "set higher CPU",
+			args: args{
+				c: parseTestResourceRequirements("", "1000m", "", ""),
+				d: defaults,
+			},
+			want: parseTestResourceRequirements(limitMemory, "1000m", requestMemory, requestCPU),
+		},
+		{
+			name: "get error on to low CPU limit",
+			args: args{
+				c: parseTestResourceRequirements("", "1m", "", ""),
+				d: defaults,
+			},
+			want:    parseTestResourceRequirements(limitMemory, "1m", requestMemory, requestCPU),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := addDefaults(tt.args.c, tt.args.d)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("addDefaults() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-			// if prettyPrint(r) != prettyPrint(tt.out) {
-			// 	t.Errorf("got %q, want %q", prettyPrint(r), prettyPrint(tt.out))
-			// }
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("addDefaults() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

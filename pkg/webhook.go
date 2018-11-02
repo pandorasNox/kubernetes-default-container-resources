@@ -4,49 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"strconv"
 
-	"github.com/pandorasnox/kubernetes-default-container-resources/pkg/container"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/api/core/v1"
+	k8s_v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//ParseResourceRequirements parses string resource representations to ResourceRequirements
-func ParseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
-	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryLimit quanttiy: %s", err)
-	}
-	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPULimit quanttiy: %s", err)
-	}
-	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryRequest quanttiy: %s", err)
-	}
-	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPURequest quanttiy: %s", err)
-	}
-
-	resourceRequirements := v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryLimit,
-			v1.ResourceCPU:    defaultCPULimit,
-		},
-		Requests: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryRequest,
-			v1.ResourceCPU:    defaultCPURequest,
-		},
-	}
-
-	return resourceRequirements, nil
+// Patch represents a single JSONPatch operation
+// @see http://jsonpatch.com/
+type Patch struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value"`
 }
 
 // Mutate responds to kubernetes webhooks request to add resource limits.
-func Mutate(w http.ResponseWriter, r *http.Request, patchStrategy container.ComplementMemOrCPU, defaultResourceRequirements v1.ResourceRequirements) error {
+func Mutate(w http.ResponseWriter, r *http.Request, defaults v1.ResourceRequirements) error {
 
 	incomingAdmissionReview := &v1beta1.AdmissionReview{}
 	err := json.NewDecoder(r.Body).Decode(incomingAdmissionReview)
@@ -58,19 +35,17 @@ func Mutate(w http.ResponseWriter, r *http.Request, patchStrategy container.Comp
 	pod := v1.Pod{}
 	if err := json.Unmarshal(raw, &pod); err != nil {
 		return fmt.Errorf("failed to Unmarshal Pod from incoming AdmissionReview: %s", err)
-
 	}
 
-	containers := pod.Spec.Containers
-	requestUID := incomingAdmissionReview.Request.UID
-	outgoingAdmissionReview, err := admissionReview(patchStrategy, containers, requestUID, defaultResourceRequirements)
-	if err != nil {
-		return fmt.Errorf("failed to get outgoingAdmissionReview: %s", err)
-	}
+	resp, err := podPatches(pod.Spec.Containers, defaults)
+
+	resp.UID = incomingAdmissionReview.Request.UID
+	patchType := v1beta1.PatchTypeJSONPatch
+	resp.PatchType = &patchType
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(outgoingAdmissionReview)
+	err = json.NewEncoder(w).Encode(v1beta1.AdmissionReview{Response: resp})
 	if err != nil {
 		return fmt.Errorf("failed to encode outgoingAdmissionReview and send response: %s", err)
 	}
@@ -78,37 +53,93 @@ func Mutate(w http.ResponseWriter, r *http.Request, patchStrategy container.Comp
 	return nil
 }
 
-func admissionReview(patchStrategy container.ComplementMemOrCPU, containers []v1.Container, UID types.UID, defaultRR v1.ResourceRequirements) (v1beta1.AdmissionReview, error) {
+func podPatches(cc []v1.Container, defaults v1.ResourceRequirements) (*v1beta1.AdmissionResponse, error) {
 
-	patches, err := podPatches(patchStrategy, containers, defaultRR)
-	if err != nil {
-		return v1beta1.AdmissionReview{}, fmt.Errorf("failed to get patches for pod: %s", err)
+	resp := &v1beta1.AdmissionResponse{}
+	patches := []Patch{}
+	for i, c := range cc {
+		r, err := addDefaults(c.Resources, defaults)
+		if err != nil {
+			resp.Allowed = false
+			resp.Result = &metav1.Status{
+				Message: err.Error(),
+			}
+			return nil, fmt.Errorf("can't patch container with name: %s, reason: %s", c.Name, err)
+		}
+		patches = append(patches, Patch{
+			Op:    "replace",
+			Path:  filepath.Join("/spec/containers", strconv.Itoa(i), "resources"),
+			Value: r,
+		})
 	}
 
-	jsonPatch, err := json.Marshal(patches)
+	json, err := json.Marshal(patches)
 	if err != nil {
-		return v1beta1.AdmissionReview{}, fmt.Errorf("failed to encode patch: %s", err)
+		return nil, fmt.Errorf("failed to encode patch: %s", err)
 	}
 
-	patchType := v1beta1.PatchTypeJSONPatch
-	return v1beta1.AdmissionReview{
-		Response: &v1beta1.AdmissionResponse{
-			UID:       UID,
-			Allowed:   true,
-			Patch:     []byte(jsonPatch),
-			PatchType: &patchType,
-		},
-	}, nil
+	resp.Allowed = true
+	resp.Patch = []byte(json)
+
+	return resp, nil
 }
 
-func podPatches(patchStrategy container.ComplementMemOrCPU, containers []v1.Container, defaultRR v1.ResourceRequirements) ([]container.Patch, error) {
-	patches := []container.Patch{}
-	for i, c := range containers {
-		containerPatches := patchStrategy.Patches(i, c.Resources, defaultRR)
+func addDefaults(c k8s_v1.ResourceRequirements, d k8s_v1.ResourceRequirements) (k8s_v1.ResourceRequirements, error) {
 
-		for _, p := range containerPatches {
-			patches = append(patches, p)
-		}
+	if _, found := c.Limits[k8s_v1.ResourceMemory]; !found {
+		c.Limits[k8s_v1.ResourceMemory] = d.Limits[k8s_v1.ResourceMemory]
 	}
-	return patches, nil
+	if _, found := c.Limits[k8s_v1.ResourceCPU]; !found {
+		c.Limits[k8s_v1.ResourceCPU] = d.Limits[k8s_v1.ResourceCPU]
+	}
+	if _, found := c.Requests[k8s_v1.ResourceMemory]; !found {
+		c.Requests[k8s_v1.ResourceMemory] = d.Requests[k8s_v1.ResourceMemory]
+	}
+	if _, found := c.Requests[k8s_v1.ResourceCPU]; !found {
+		c.Requests[k8s_v1.ResourceCPU] = d.Requests[k8s_v1.ResourceCPU]
+	}
+
+	requestMem := c.Requests[k8s_v1.ResourceMemory]
+	limitMem := c.Limits[k8s_v1.ResourceMemory]
+	if requestMem.Cmp(limitMem) == 1 {
+		return c, fmt.Errorf("requested memory is greater than memory limit")
+	}
+
+	requestCPU := c.Requests[k8s_v1.ResourceCPU]
+	limitCPU := c.Limits[k8s_v1.ResourceCPU]
+	if requestCPU.Cmp(limitCPU) == 1 {
+		return c, fmt.Errorf("requested cpu is greater than cpu limit")
+	}
+
+	return c, nil
+}
+
+func ParseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
+	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryLimit quantity: %s", err)
+	}
+	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPULimit quantity: %s", err)
+	}
+	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryRequest quantity: %s", err)
+	}
+	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPURequest quantity: %s", err)
+	}
+
+	return v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryLimit,
+			v1.ResourceCPU:    defaultCPULimit,
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryRequest,
+			v1.ResourceCPU:    defaultCPURequest,
+		},
+	}, nil
 }

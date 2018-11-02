@@ -1,0 +1,229 @@
+package webhook
+
+import (
+	"strconv"
+	"testing"
+
+	"github.com/pandorasnox/kubernetes-default-container-resources/pkg/container"
+	k8s_v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+func getResourceQuantity(quantity string) resource.Quantity {
+	resDef, _ := resource.ParseQuantity(quantity)
+	return resDef
+}
+
+func TestSingleContainerPodPatchesComplementToDefault(t *testing.T) {
+	patchStrategy := container.ComplementToDefault{}
+
+	var singleContainerPodTests = []struct {
+		name string
+		in   []k8s_v1.Container
+		out  []container.Patch
+	}{
+		{
+			"container without ResourceRequirements",
+			[]k8s_v1.Container{
+				k8s_v1.Container{
+					Resources: k8s_v1.ResourceRequirements{},
+				},
+			},
+			[]container.Patch{
+				container.Patch{"replace", "/spec/containers/0/resources",
+					k8s_v1.ResourceRequirements{
+						Limits: k8s_v1.ResourceList{
+							k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
+							k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
+						},
+						Requests: k8s_v1.ResourceList{
+							k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
+							k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
+						},
+					},
+				},
+			},
+		},
+		//name: limit mem greater than or equal to default limit mem
+		//in
+		// limit.mem = x {{x >= default}}
+		//out
+		// limit.mem = x
+		// limit.cpu = default.limit.cpu
+		// request.mem = default.request.mem
+		// request.cpu = default.request.cpu
+
+		//name: limit mem smaller than default limit mem
+		//in
+		// limit.mem = x {{x < default.limit.mem}}
+		//out
+		// limit.mem = x
+		// limit.cpu = default.limit.cpu
+		// request.mem = (x < default.request.mem ? x : default.request.mem)
+		// request.cpu = default.request.cpu
+
+		//name: limit cpu greater than or equal to default limit cpu
+		//in
+		// limit.cpu = x {{x >= default.limit.cpu}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = x
+		// request.mem default.request.mem
+		// request.cpu default.request.cpu
+
+		//name: limit cpu smaller than default limit cpu
+		//in
+		// limit.cpu = x {{x < default.limit.cpu}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = x
+		// request.mem = default.request.mem
+		// request.cpu = (x < default.request.cpu ? x : default.request.cpu)
+
+		//name: ...
+		//in
+		// request.mem = a {{a >= default.request.mem}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = default.limit.cpu
+		// request.mem = a
+		// request.cpu = default.request.cpu
+
+		////name: ...
+		//in
+		// request.mem = a {{a < default.request.mem}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = default.limit.cpu
+		// request.mem = a
+		// request.cpu = default.request.cpu
+
+		//name: ...
+		//in
+		// request.cpu = b {{a >= default.request.cpu}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = default.limit.cpu
+		// request.mem = default.request.mem
+		// request.cpu = b
+
+		//name: ...
+		//in
+		// request.cpu = b {{a < default.request.cpu}}
+		//out
+		// limit.mem = default.limit.mem
+		// limit.cpu = default.limit.cpu
+		// request.mem = default.request.mem
+		// request.cpu = b
+
+		//====================================================
+		// happy path
+		//====================================================
+		//name: ...
+		//in
+		// limit.mem = x {{x >= default}}
+		// limit.cpu = y {{y >= default}}
+		//out
+		// limit.mem = x
+		// limit.cpu = y
+		// request.mem = default.request.mem
+		// request.cpu = default.request.cpu
+
+		//name: ...
+		//in
+		// limit.mem = x {{x >= default}}
+		// limit.cpu = y {{y >= default}}
+		// request.mem = a {{a >= default >= x}}
+		//out
+		// limit.mem = x
+		// limit.cpu = y
+		// request.mem = a
+		// request.cpu = default.request.cpu
+
+		//name: ...
+		//in
+		// limit.mem = x {{x >= default}}
+		// limit.cpu = y {{y >= default}}
+		// request.mem = a {{a >= default >= x}}
+		// request.cpu = b {{b >= default >= y}}
+		//out
+		// []
+		//====================================================
+
+		//
+		//
+		//
+		//demanded limit smaller that demanded request
+		//in
+		// limit.mem = x
+		// request.mem = y {{y > x}}
+		//out
+		// [] OR [], err
+		//
+		//
+		//
+		//demanded limit smaller that demanded request
+		//in
+		// limit.cpu = x
+		// request.cpu = y {{y > x}}
+		//out
+		// [] OR [], err
+		{
+			"container with limited cpu and requested memory",
+			[]k8s_v1.Container{
+				k8s_v1.Container{
+					Resources: k8s_v1.ResourceRequirements{
+						Limits: k8s_v1.ResourceList{
+							k8s_v1.ResourceCPU: defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
+						},
+						Requests: k8s_v1.ResourceList{
+							k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
+						},
+					},
+				},
+			},
+			[]container.Patch{
+				container.Patch{"replace", "/spec/containers/0/resources",
+					k8s_v1.ResourceRequirements{
+						Limits: k8s_v1.ResourceList{
+							k8s_v1.ResourceMemory: defaultResourceRequirements.Limits[k8s_v1.ResourceMemory],
+							k8s_v1.ResourceCPU:    defaultResourceRequirements.Limits[k8s_v1.ResourceCPU],
+						},
+						Requests: k8s_v1.ResourceList{
+							k8s_v1.ResourceMemory: defaultResourceRequirements.Requests[k8s_v1.ResourceMemory],
+							k8s_v1.ResourceCPU:    defaultResourceRequirements.Requests[k8s_v1.ResourceCPU],
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, tt := range singleContainerPodTests {
+		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
+			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
+			// if !reflect.DeepEqual(r, tt.out) {
+			// 	t.Errorf("got %q, want %q", r, tt.out)
+			// }
+			if prettyPrint(r) != prettyPrint(tt.out) {
+				t.Errorf("got %q, want %q", prettyPrint(r), prettyPrint(tt.out))
+			}
+		})
+	}
+}
+
+// func TestMultiContainerPodPatchesComplementMemOrCPU(t *testing.T) {
+// 	patchStrategy := container.ComplementMemOrCPU{}
+
+// 	for i, tt := range multiContainerPodTests {
+// 		t.Run(strconv.Itoa(i)+"_"+tt.name, func(t *testing.T) {
+// 			r, _ := podPatches(patchStrategy, tt.in, defaultResourceRequirements)
+// 			if !reflect.DeepEqual(r, tt.out) {
+// 				t.Errorf("got %q, want %q", r, tt.out)
+// 			}
+// 			// if prettyPrint(r) != prettyPrint(tt.out) {
+// 			// 	t.Errorf("got %q, want %q", prettyPrint(r), prettyPrint(tt.out))
+// 			// }
+// 		})
+// 	}
+// }

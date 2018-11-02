@@ -4,13 +4,11 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"log"
 	"net/http"
 	"os"
 
-	"log"
-
 	"github.com/pandorasnox/kubernetes-default-container-resources/pkg"
-	"github.com/pandorasnox/kubernetes-default-container-resources/pkg/container"
 	"github.com/sirupsen/logrus"
 )
 
@@ -51,10 +49,8 @@ func main() {
 		log.Fatalf("could not parse resource requirements based on program flags: %s", err)
 	}
 
-	patchStrategy := container.ComplementMemOrCPU{}
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := webhook.Mutate(w, r, patchStrategy, defaultResourceRequirements)
+		err := webhook.Mutate(w, r, defaultResourceRequirements)
 		if err != nil {
 			//todo: use "Fatalf" instead of "Printf"???
 			log.Printf("mutation failed: %s", err)
