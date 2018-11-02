@@ -4,6 +4,8 @@ a Kubernetes admission controller mutating webhook which adds default compute re
 ### generate cert.pem and key.pem for ListenAndServeTLS
 `docker run --rm -v $(pwd)/certs:/certs -e SSL_SUBJECT=test.example.com -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="pls-replace-me-kubernetes-name" paulczar/omgwtfssl`
 
+`docker run --rm -v $(pwd)/certs:/certs -e SSL_SUBJECT=default-container-resources.mutating-webhook.svc -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="pls-replace-me-kubernetes-name" paulczar/omgwtfssl`
+
 after that, to change permissions ... run:
 `sudo chown -R username:groupname certs`
 
