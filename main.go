@@ -4,25 +4,15 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/pandorasnox/kubernetes-default-container-resources/pkg"
 	"github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
-
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.JSONFormatter{})
-
-	// Output to stdout instead of the default stderr
-	// Can be any io.Writer, see below for File example
-	logrus.SetOutput(os.Stdout)
-
-	// Only log the warning severity or above.
-	// log.SetLevel(log.WarnLevel)
-}
 
 func main() {
 	tlsDisabled := flag.Bool("tlsDisabled", false, "disabled tls for the server")
@@ -35,6 +25,11 @@ func main() {
 	sslKey := flag.String("sslKey", "/certs/ssl-key.pem", "address to bind to")
 	flag.Parse()
 
+	logrus.SetFormatter(&logrus.JSONFormatter{
+		DataKey: "data",
+		// PrettyPrint: true,
+	})
+
 	logrus.WithFields(logrus.Fields{
 		"tlsDisabled":   *tlsDisabled,
 		"addr":          *addr,
@@ -42,12 +37,16 @@ func main() {
 		"limitCPU":      *limitCPU,
 		"requestMemory": *requestMemory,
 		"requestCPU":    *requestCPU,
-	}).Info("log programm flags")
+	}).Info("programm flags")
 
-	defaultResourceRequirements, err := webhook.ParseResourceRequirements(*limitMemory, *limitCPU, *requestMemory, *requestCPU)
+	defaultResourceRequirements, err := parseResourceRequirements(*limitMemory, *limitCPU, *requestMemory, *requestCPU)
 	if err != nil {
 		log.Fatalf("could not parse resource requirements based on program flags: %s", err)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"defaultResourceRequirements": defaultResourceRequirements,
+	}).Info("parsed defaultResourceRequirements")
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		err := webhook.Mutate(w, r, defaultResourceRequirements)
@@ -77,4 +76,34 @@ func main() {
 		},
 	}
 	log.Fatalf("tls server stop because: %s", server.ListenAndServeTLS(*sslCert, *sslKey))
+}
+
+func parseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
+	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryLimit quantity: %s", err)
+	}
+	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPULimit quantity: %s", err)
+	}
+	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryRequest quantity: %s", err)
+	}
+	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
+	if err != nil {
+		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPURequest quantity: %s", err)
+	}
+
+	return v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryLimit,
+			v1.ResourceCPU:    defaultCPULimit,
+		},
+		Requests: v1.ResourceList{
+			v1.ResourceMemory: defaultMemoryRequest,
+			v1.ResourceCPU:    defaultCPURequest,
+		},
+	}, nil
 }

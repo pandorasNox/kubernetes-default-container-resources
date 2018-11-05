@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/api/admission/v1beta1"
-	"k8s.io/api/core/v1"
 	k8s_v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,37 +22,50 @@ type Patch struct {
 }
 
 // Mutate responds to kubernetes webhooks request to add resource limits.
-func Mutate(w http.ResponseWriter, r *http.Request, defaults v1.ResourceRequirements) error {
+func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequirements) error {
 
-	incomingAdmissionReview := &v1beta1.AdmissionReview{}
-	err := json.NewDecoder(r.Body).Decode(incomingAdmissionReview)
+	in := &v1beta1.AdmissionReview{}
+	err := json.NewDecoder(r.Body).Decode(in)
 	if err != nil {
 		return fmt.Errorf("failed to decode body: %s", err)
 	}
 
-	raw := incomingAdmissionReview.Request.Object.Raw
-	pod := v1.Pod{}
-	if err := json.Unmarshal(raw, &pod); err != nil {
+	pod := k8s_v1.Pod{}
+	if err := json.Unmarshal(in.Request.Object.Raw, &pod); err != nil {
 		return fmt.Errorf("failed to Unmarshal Pod from incoming AdmissionReview: %s", err)
 	}
 
-	resp, err := podPatches(pod.Spec.Containers, defaults)
+	resp, err := createResponse(pod.Spec.Containers, defaults)
+	if err != nil {
+		return fmt.Errorf("failed to create response: %s", err)
+	}
 
-	resp.UID = incomingAdmissionReview.Request.UID
+	resp.UID = in.Request.UID
 	patchType := v1beta1.PatchTypeJSONPatch
 	resp.PatchType = &patchType
 
+	if resp.Result != nil && resp.Result.Status == metav1.StatusFailure {
+		logrus.WithFields(logrus.Fields{
+			"AdmissionResponse": resp,
+		}).Warn("failed AdmissionResponse")
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(v1beta1.AdmissionReview{Response: resp})
+	out := v1beta1.AdmissionReview{Response: resp}
+	err = json.NewEncoder(w).Encode(out)
 	if err != nil {
-		return fmt.Errorf("failed to encode outgoingAdmissionReview and send response: %s", err)
+		return fmt.Errorf("failed to encode and send response: %s", err)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"AdmissionReview": out,
+	}).Info("Success AdmissionReview")
 
 	return nil
 }
 
-func podPatches(cc []v1.Container, defaults v1.ResourceRequirements) (*v1beta1.AdmissionResponse, error) {
+func createResponse(cc []k8s_v1.Container, defaults k8s_v1.ResourceRequirements) (*v1beta1.AdmissionResponse, error) {
 
 	resp := &v1beta1.AdmissionResponse{}
 	patches := []Patch{}
@@ -63,8 +75,9 @@ func podPatches(cc []v1.Container, defaults v1.ResourceRequirements) (*v1beta1.A
 			resp.Allowed = false
 			resp.Result = &metav1.Status{
 				Message: err.Error(),
+				Status:  metav1.StatusFailure,
 			}
-			return nil, fmt.Errorf("can't patch container with name: %s, reason: %s", c.Name, err)
+			return resp, nil
 		}
 		patches = append(patches, Patch{
 			Op:    "replace",
@@ -85,6 +98,13 @@ func podPatches(cc []v1.Container, defaults v1.ResourceRequirements) (*v1beta1.A
 }
 
 func addDefaults(c k8s_v1.ResourceRequirements, d k8s_v1.ResourceRequirements) (k8s_v1.ResourceRequirements, error) {
+
+	if c.Limits == nil {
+		c.Limits = k8s_v1.ResourceList{}
+	}
+	if c.Requests == nil {
+		c.Requests = k8s_v1.ResourceList{}
+	}
 
 	if _, found := c.Limits[k8s_v1.ResourceMemory]; !found {
 		c.Limits[k8s_v1.ResourceMemory] = d.Limits[k8s_v1.ResourceMemory]
@@ -112,34 +132,4 @@ func addDefaults(c k8s_v1.ResourceRequirements, d k8s_v1.ResourceRequirements) (
 	}
 
 	return c, nil
-}
-
-func ParseResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) (v1.ResourceRequirements, error) {
-	defaultMemoryLimit, err := resource.ParseQuantity(memoryLimit)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryLimit quantity: %s", err)
-	}
-	defaultCPULimit, err := resource.ParseQuantity(CPULimit)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPULimit quantity: %s", err)
-	}
-	defaultMemoryRequest, err := resource.ParseQuantity(memoryRequest)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse memoryRequest quantity: %s", err)
-	}
-	defaultCPURequest, err := resource.ParseQuantity(CPURequest)
-	if err != nil {
-		return v1.ResourceRequirements{}, fmt.Errorf("failed to parse CPURequest quantity: %s", err)
-	}
-
-	return v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryLimit,
-			v1.ResourceCPU:    defaultCPULimit,
-		},
-		Requests: v1.ResourceList{
-			v1.ResourceMemory: defaultMemoryRequest,
-			v1.ResourceCPU:    defaultCPURequest,
-		},
-	}, nil
 }
