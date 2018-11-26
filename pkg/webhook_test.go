@@ -80,7 +80,7 @@ func Test_addDefaults(t *testing.T) {
 			want: defaults,
 		},
 		{
-			name: "empty Requests sets default",
+			name: "empty Limits sets default",
 			args: args{
 				c: k8s_v1.ResourceRequirements{
 					Limits: k8s_v1.ResourceList{},
@@ -90,10 +90,10 @@ func Test_addDefaults(t *testing.T) {
 			want: defaults,
 		},
 		{
-			name: "empty Limits sets default",
+			name: "empty Requests sets default",
 			args: args{
 				c: k8s_v1.ResourceRequirements{
-					Limits: k8s_v1.ResourceList{},
+					Requests: k8s_v1.ResourceList{},
 				},
 				d: defaults,
 			},
@@ -165,7 +165,14 @@ func Test_addDefaults(t *testing.T) {
 			want:    parseTestResourceRequirements(limitMemory, "0.05", requestMemory, requestCPU),
 			wantErr: true,
 		},
-
+		{
+			name: "Limits mem & cpu greater than default limit",
+			args: args{
+				c: parseTestResourceRequirements("2G", "0.6", "", ""),
+				d: defaults,
+			},
+			want: parseTestResourceRequirements("2G", "0.6", requestMemory, requestCPU),
+		},
 		{
 			name: "set higher CPU",
 			args: args{
