@@ -23,12 +23,17 @@ func main() {
 	addr := flag.String("addr", ":8083", "address to bind to")
 	sslCert := flag.String("sslCert", "/certs/ssl-cert.pem", "address to bind to")
 	sslKey := flag.String("sslKey", "/certs/ssl-key.pem", "address to bind to")
+	dryRun := flag.Bool("dry-run", false, "enables dry-run mode, always returning success AdmissionReview")
 	flag.Parse()
 
 	logrus.SetFormatter(&logrus.JSONFormatter{
 		DataKey: "data",
 		// PrettyPrint: true,
 	})
+
+	logrus.WithFields(logrus.Fields{
+		"dry-run": *dryRun,
+	}).Info("dry-run status")
 
 	logrus.WithFields(logrus.Fields{
 		"tlsDisabled":   *tlsDisabled,
@@ -49,7 +54,7 @@ func main() {
 	}).Info("parsed defaultResourceRequirements")
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		err := webhook.Mutate(w, r, defaultResourceRequirements)
+		err := webhook.Mutate(w, r, defaultResourceRequirements, *dryRun)
 		if err != nil {
 			//todo: use "Fatalf" instead of "Printf"???
 			log.Printf("mutation failed: %s", err)

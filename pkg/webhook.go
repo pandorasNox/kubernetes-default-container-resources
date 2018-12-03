@@ -22,7 +22,7 @@ type Patch struct {
 }
 
 // Mutate responds to kubernetes webhooks request to add resource limits.
-func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequirements) error {
+func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequirements, dryRun bool) error {
 
 	in := &v1beta1.AdmissionReview{}
 	err := json.NewDecoder(r.Body).Decode(in)
@@ -50,9 +50,19 @@ func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequ
 		}).Warn("failed AdmissionResponse")
 	}
 
+	out := v1beta1.AdmissionReview{Response: resp}
+
+	if dryRun {
+		logrus.WithFields(logrus.Fields{
+			"dryRun":          dryRun,
+			"AdmissionReview": out,
+		}).Info("DRY-RUN: supposed AdmissionReview")
+
+		out.Response = &v1beta1.AdmissionResponse{Allowed: true}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	out := v1beta1.AdmissionReview{Response: resp}
 	err = json.NewEncoder(w).Encode(out)
 	if err != nil {
 		return fmt.Errorf("failed to encode and send response: %s", err)
@@ -60,7 +70,7 @@ func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequ
 
 	logrus.WithFields(logrus.Fields{
 		"AdmissionReview": out,
-	}).Info("Success AdmissionReview")
+	}).Info("Success sended AdmissionReview")
 
 	return nil
 }
