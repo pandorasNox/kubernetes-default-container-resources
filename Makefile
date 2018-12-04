@@ -75,3 +75,9 @@ run:
 .PHONY: run-no-tls
 run-no-tls: 
 	go run main.go -tlsDisabled true
+
+.PHONY: certs
+certs:
+	rm -rf certs/*
+	docker run --rm -v $(PWD)/certs:/certs -e SSL_SUBJECT=default-container-resources.mutating-webhook.svc -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="tls-cert-default-container-resources" -e K8S_NAMESPACE="mutating-webhook" -e CA_EXPIRE=3650 paulczar/omgwtfssl
+	docker run --rm -v $(PWD)/certs:/certs alpine:3.8 sh -c "chmod -R a+rw /certs"
