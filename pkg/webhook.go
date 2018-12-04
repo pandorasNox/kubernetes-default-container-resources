@@ -54,8 +54,9 @@ func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequ
 
 	if dryRun {
 		logrus.WithFields(logrus.Fields{
-			"dryRun":          dryRun,
-			"AdmissionReview": out,
+			"dryRun":              dryRun,
+			"in_AdmissionReview":  in,
+			"out_AdmissionReview": out,
 		}).Info("DRY-RUN: supposed AdmissionReview")
 
 		out.Response = &v1beta1.AdmissionResponse{Allowed: true}
