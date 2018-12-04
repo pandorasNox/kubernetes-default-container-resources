@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-without-resources
+  name: pod-with-wrong-resources
   namespace: foo
 spec:
   containers:
