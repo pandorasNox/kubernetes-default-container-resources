@@ -27,7 +27,7 @@ func Mutate(w http.ResponseWriter, r *http.Request, defaults k8s_v1.ResourceRequ
 	in := &v1beta1.AdmissionReview{}
 	err := json.NewDecoder(r.Body).Decode(in)
 	if err != nil {
-		return fmt.Errorf("failed to decode body: %s", err)
+		return fmt.Errorf("failed to json decode body: %s", err)
 	}
 
 	pod := k8s_v1.Pod{}

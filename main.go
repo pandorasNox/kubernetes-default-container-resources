@@ -53,6 +53,8 @@ func main() {
 		if err != nil {
 			//todo: use "Fatalf" instead of "Printf"???
 			log.Printf("mutation failed: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("400 - Bad request!"))
 		}
 	})
 
