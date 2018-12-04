@@ -49,6 +49,7 @@ deploy: ##@setup deploys the webhook server + mutate config to the current kuber
 undeploy: ##@setup undeploy the mutate server webhook
 	kubectl delete -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
+	./hack/wait-until-ns-deleted.sh
 
 .PHONY: mini-clear-intermediate
 mini-clear-intermediate: ##@minikube deletes all intermediate docker images on minikube k8s cluster
