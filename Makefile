@@ -69,6 +69,10 @@ test-undeploy: ##@dev unddeploys a test example
 test: ##@testing runs all go tests
 	go test -v ./pkg/
 
+.PHONY: bats
+bats: ##@testing runs all bats tests
+	bats ./tests/bats/apply-pod-without-resources.bats
+
 .PHONY: run
 run: 
 	go run main.go -sslCert "./certs/ssl-cert.pem" -sslKey "./certs/ssl-key.pem"
