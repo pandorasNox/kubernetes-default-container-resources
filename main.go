@@ -53,6 +53,10 @@ func main() {
 		"defaultResourceRequirements": defaultResourceRequirements,
 	}).Info("parsed defaultResourceRequirements")
 
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		err := webhook.Mutate(w, r, defaultResourceRequirements, *dryRun)
 		if err != nil {
