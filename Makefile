@@ -23,7 +23,7 @@ ifeq (mini-do,$(firstword $(MAKECMDGOALS)))
   $(eval $(DO_ARGS):;@:)
 endif
 .PHONY: mini-do
-mini-do: ##@minikube reuse minikube docker env
+mini-do: ##@minikube reuse minikube docker env to run docker cmd's | e.g. `make mini-do ps`
 	@eval $$(minikube docker-env) ;\
 	docker $(DO_ARGS)
 
@@ -35,7 +35,7 @@ ifeq (build,$(firstword $(MAKECMDGOALS)))
   $(eval $(DO_ARGS):;@:)
 endif
 .PHONY: mini-build
-mini-build: ##@minikube reuse minikube docker env
+mini-build: ##@minikube build docker img in minikube env
 	@eval $$(minikube docker-env) ;\
 	docker build -t pandorasnox/kubernetes-default-container-resources:1.1.0 .
 
@@ -46,7 +46,7 @@ deploy: ##@setup deploys the webhook server + mutate config to the current kuber
 		-f kubernetes/MutatingWebhookConfiguration.yaml
 
 .PHONY: undeploy
-undeploy: ##@setup undeploy the mutate server webhook
+undeploy: ##@setup undeploy the mutate server webhook (based on current kubernetes ctx)
 	kubectl delete -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
 	./hack/wait-until-ns-deleted.sh
@@ -56,12 +56,12 @@ mini-clear-intermediate: ##@minikube deletes all intermediate docker images on m
 	@eval $$(minikube docker-env) ;\
 	docker rmi -f $$(docker images --filter dangling=true -q)
 
-.PHONY: test-deploy
+.PHONY: test-deploy (based on current kubernetes ctx)
 test-deploy: ##@dev deploys a test example
 	kubectl apply -f kubernetes/example/namespace.yaml \
 		-f kubernetes/example/
 
-.PHONY: test-undeploy
+.PHONY: test-undeploy (based on current kubernetes ctx)
 test-undeploy: ##@dev unddeploys a test example
 	kubectl delete -f kubernetes/example/namespace.yaml
 
@@ -74,15 +74,15 @@ bats: ##@testing runs all bats tests
 	bats ./tests/bats/apply-pod-without-resources.bats
 
 .PHONY: run
-run: 
+run: ##@dev
 	go run main.go -sslCert "./certs/ssl-cert.pem" -sslKey "./certs/ssl-key.pem"
 
 .PHONY: run-no-tls
-run-no-tls: 
+run-no-tls: ##@dev
 	go run main.go -tlsDisabled true
 
 .PHONY: certs
-certs:
+certs: ##@dev
 	rm -rf certs/*
 	docker run --rm -v $(PWD)/certs:/certs -e SSL_SUBJECT=default-container-resources.mutating-webhook.svc -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="tls-cert-default-container-resources" -e K8S_NAMESPACE="mutating-webhook" -e CA_EXPIRE=3650 paulczar/omgwtfssl
 	docker run --rm -v $(PWD)/certs:/certs alpine:3.8 sh -c "chmod -R a+rw /certs"
