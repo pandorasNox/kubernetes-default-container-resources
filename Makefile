@@ -2,6 +2,8 @@
 include ./hack/help.mk
 include ./hack/lint.mk
 
+include ./hack/minikube/ci-minikube.mk
+
 UID:=$(shell id -u)
 GID:=$(shell id -g)
 PWD:=$(shell pwd)
