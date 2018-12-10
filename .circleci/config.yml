@@ -84,7 +84,7 @@ jobs:
           name: end-to-end test
           command: |
             # make end-to-end-test
-            make bats
+            timeout 10 make bats
       # - run:
       #     name: queue test
       #     command: |
