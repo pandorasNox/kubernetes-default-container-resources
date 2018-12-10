@@ -11,4 +11,4 @@ lint: ##@testing lints go code
 	-w /go/src/github.com/pandorasnox/kubernetes-default-container-resources/ \
 	--entrypoint "/bin/sh" \
 	$(LINT_IMAGE) \
-	-c "go get -v .; echo ''; echo 'lint results:'; gometalinter ./... | grep -v '../../../../../usr/local' | grep -v 'vendor'"
+	-c "golangci-lint run ./"
