@@ -1,13 +1,10 @@
 # kubernetes-default-container-resources
 a Kubernetes admission controller mutating webhook which adds default compute resources to container
 
-### generate cert.pem and key.pem for ListenAndServeTLS
-`docker run --rm -v $(pwd)/certs:/certs -e SSL_SUBJECT=test.example.com -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="pls-replace-me-kubernetes-name" paulczar/omgwtfssl`
+[![Go Report Card](https://goreportcard.com/badge/github.com/pandorasNox/kubernetes-default-container-resources)](https://goreportcard.com/report/github.com/pandorasNox/kubernetes-default-container-resources)
 
-`docker run --rm -v $(pwd)/certs:/certs -e SSL_SUBJECT=default-container-resources.mutating-webhook.svc -e SSL_KEY="ssl-key.pem" -e SSL_CSR="ssl-key.csr" -e SSL_CERT="ssl-cert.pem" -e K8S_NAME="pls-replace-me-kubernetes-name" paulczar/omgwtfssl`
-
-after that, to change permissions ... run:
-`sudo chown -R username:groupname certs`
+### (re)generate cert.pem and key.pem for TLS test support
+`make certs`
 
 ## test local
 ### deps
