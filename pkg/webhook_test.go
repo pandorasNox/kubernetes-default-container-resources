@@ -26,10 +26,10 @@ func getResourceQuantity(quantity string) resource.Quantity {
 func parseTestResourceRequirements(memoryLimit, CPULimit, memoryRequest, CPURequest string) k8s_v1.ResourceRequirements {
 	r := k8s_v1.ResourceRequirements{}
 
-	if (memoryLimit != "" || CPULimit != "") && r.Limits == nil {
+	if memoryLimit != "" || CPULimit != "" {
 		r.Limits = k8s_v1.ResourceList{}
 	}
-	if (memoryRequest != "" || CPURequest != "") && r.Requests == nil {
+	if memoryRequest != "" || CPURequest != "" {
 		r.Requests = k8s_v1.ResourceList{}
 	}
 
