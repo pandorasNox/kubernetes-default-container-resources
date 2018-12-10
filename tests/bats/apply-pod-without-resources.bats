@@ -11,21 +11,17 @@
 }
 
 @test "apply pod without resources sets default resources" {
-    # ensure test namespace is not running
-    kubectl delete ns bats-test > /dev/null || true
-    until [ $(kubectl get ns bats-test 2> /dev/null | wc -l) -eq 0 ]; do
-        sleep 1
-    done
 
     # create test namespace
-    kubectl create ns bats-test > /dev/null
+    test_ns=draco-test-$(uuidgen)
+    kubectl create ns $test_ns > /dev/null
 
     cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
   name: pod-without-resources
-  namespace: bats-test
+  namespace: $test_ns
 spec:
   containers:
   - image: nginx:1.7.9
@@ -35,7 +31,7 @@ spec:
       protocol: TCP
 EOF
 
-    resources_found=$(kubectl -n bats-test get po -o yaml | grep -A 6 "resources:")
+    resources_found=$(kubectl -n $test_ns get po -o yaml | grep -A 6 "resources:")
 
     expected_resources=$(cat <<-END
       resources:
@@ -49,7 +45,7 @@ END
 )
 
     # clean-up test namespace
-    kubectl delete ns bats-test > /dev/null || true
+    kubectl delete ns $test_ns > /dev/null || true
 
     result="0"
     if [ "$resources_found" == "$expected_resources" ]; then

@@ -39,13 +39,14 @@ endif
 .PHONY: mini-build
 mini-build: ##@minikube build docker img in minikube env
 	@eval $$(minikube docker-env) ;\
-	docker build -t pandorasnox/kubernetes-default-container-resources:1.1.0 .
+	docker build -t pandorasnox/kubernetes-default-container-resources:1.4 .
 
 .PHONY: deploy
 deploy: ##@setup deploys the webhook server + mutate config to the current kubernetes ctx
 	kubectl apply -f kubernetes/deploy/namespace.yaml \
 		-f kubernetes/deploy/ \
 		-f kubernetes/MutatingWebhookConfiguration.yaml
+	./hack/wait-for-webhook.sh
 
 .PHONY: undeploy
 undeploy: ##@setup undeploy the mutate server webhook (based on current kubernetes ctx)

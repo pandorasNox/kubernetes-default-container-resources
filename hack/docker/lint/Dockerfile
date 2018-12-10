@@ -5,14 +5,10 @@ FROM golang:1.10.3-alpine3.7 AS compile
 #     rm -rf /var/lib/apt/lists/* && \
 #     rm /var/cache/apk/*
 
-# RUN go get -u github.com/alecthomas/gometalinter && \
-#     gometalinter --install
-
 # golangci-lint
 # In alpine linux (as it does not come with curl by default)
 ENV CGO_ENABLED=0
 ENV GOOS=linux
-# CGO_ENABLED=0 GOOS=linux
 RUN wget https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh && \
     chmod +x install.sh && \
     ./install.sh
@@ -22,13 +18,3 @@ RUN wget https://raw.githubusercontent.com/golangci/golangci-lint/master/install
 
 ENTRYPOINT ["golangci-lint"]
 CMD ["--help"]
-
-
-
-# FROM golang:1.11
-
-# RUN wget https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh && \
-#     chmod +x install.sh && \
-#     ./install.sh
-
-# CMD ["golangci-lint"]
