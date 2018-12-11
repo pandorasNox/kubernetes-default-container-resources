@@ -1,13 +1,22 @@
 
-version: "2.3"
+
+version: 2
+
 jobs:
   build:
     machine:
-      enabled: true
-      image: circleci/classic:201711-01
+      # enabled: true
+      image: circleci/classic:201808-01
     environment:
       GOPATH: /home/circleci/go
-      MINIKUBE_HOME: /home/circleci/go/src/github.com/pandorasNox/kubernetes-default-container-resources
+      # MINIKUBE_HOME: /home/circleci/go/src/github.com/pandorasNox/kubernetes-default-container-resources
+      K8S_VERSION: "v1.12.0"
+      KUBECONFIG: /home/circleci/.kube/config
+      MINIKUBE_VERSION: v0.31.0
+      MINIKUBE_WANTUPDATENOTIFICATION: false
+      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_HOME: /home/circleci
+      CHANGE_MINIKUBE_NONE_USER: true
     working_directory: ~/go/src/github.com/pandorasNox/kubernetes-default-container-resources
     steps:
       # - restore_cache:
@@ -15,57 +24,45 @@ jobs:
       #     keys:
       #       - tools-v6
       - checkout
-      - run:
-          name: go test
-          command: |
-            make test
-      - run:
-          name: lint go
-          command: |
-            make lint
-      - run:
-          name: install kubectl & minikube
-          command: |
-            if [ ! -f kubectl ]; then
-              curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.8.4/bin/linux/amd64/kubectl
-            fi
-            chmod +x kubectl
-            sudo cp kubectl /usr/local/bin/
-            if [ ! -f minikube ]; then
-              curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v0.25.0/minikube-linux-amd64
-            fi
-            chmod +x minikube
-            sudo cp minikube /usr/local/bin/
-      - run:
-          name: init minikube
-          command: |
-            make ci-mini-init
-            sleep 65536
-          background: true
       # - run:
-      #     name: install go metalinter
+      #     name: go test
       #     command: |
-      #       if [ ! -d gometalinter ]; then
-      #         mkdir gometalinter
-      #         go get -u github.com/alecthomas/gometalinter
-      #         $GOPATH/bin/gometalinter --install
-      #         mv $GOPATH/bin/* gometalinter
-      #       fi
-      #       sudo cp gometalinter/* /usr/local/bin/
+      #       make test
       # - run:
-      #     name: preload docker imags
+      #     name: lint go
       #     command: |
-      #       mkdir -p docker-image-cache
-      #       cd docker-image-cache
-      #       ../hack/docker-image.sh registry:2.6.2          registry-2.6.2
-      #       ../hack/docker-image.sh docker:17.12.1-ce-dind  docker-17.12.1-ce-dind
-      #       ../hack/docker-image.sh golang:1.10.0-alpine3.7 golang-1.10.0-alpine3.7
-      #       ../hack/docker-image.sh alpine:3.7              alpine-3.7
-      #       ../hack/docker-image.sh ubuntu:16.04            ubuntu-16.04
+      #       make lint
+      - run:
+          name: setup kubectl
+          command: |
+            curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+      - run:
+          name: setup minikube
+          command: |
+            curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
+      - run:
+          name: start minikube
+          command: |
+            sudo -E minikube start --vm-driver=none --cpus 1 --memory 2048 --kubernetes-version=${K8S_VERSION} &> $HOME/minikube.log 2>&1 < /dev/null
+      - run:
+          name: fix RBAC
+          command: |
+            # make default account cluster-admin
+            kubectl create clusterrolebinding add-on-cluster-admin --clusterrole cluster-admin --serviceaccount=kube-system:default
+      - run:
+          name: dump cluster-info
+          command: |
+            kubectl cluster-info
       - run:
           name: wait for minikube
           command: |
-            make ci-mini-await
+            timeout 150 make ci-mini-await
+      - run:
+          name: dump running pods
+          command: |
+            kubectl get po --all-namespaces -o wide
       # - save_cache:
       #     name: save tools cache
       #     key: tools-v6
@@ -77,21 +74,19 @@ jobs:
       #       - .git
       #       - gometalinter
       - run:
-          name: deploy
+          name: deploy draco (default-resources-admission-controller)
           command: |
             timeout 60 make deploy
+      - run:
+          name: logs draco (default-resources-admission-controller)
+          background: true
+          command: |
+            kubectl -n mutating-webhook get po -o wide
+            export DRACO_POD=$(kubectl -n mutating-webhook get po --template '{{range .items}}{{.metadata.name}}{{end}}')
+            echo "start monitoring of ${DRACO_POD}"
+            kubectl -n mutating-webhook logs ${DRACO_POD} -f
       - run:
           name: end-to-end test
           command: |
             # make end-to-end-test
-            timeout 10 make bats
-      # - run:
-      #     name: queue test
-      #     command: |
-      #       make queue-test
-      # - run:
-      #     name: lint bash
-      #     command: |
-      #       sudo apt-get update
-      #       sudo apt-get install shellcheck
-      #       make lint-bash
+            timeout 60 make bats

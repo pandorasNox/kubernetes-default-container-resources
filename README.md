@@ -3,6 +3,8 @@ a Kubernetes admission controller mutating webhook which adds default compute re
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/pandorasNox/kubernetes-default-container-resources)](https://goreportcard.com/report/github.com/pandorasNox/kubernetes-default-container-resources)
 
+[![CircleCI](https://circleci.com/gh/pandorasNox/kubernetes-default-container-resources.svg?style=svg)](https://circleci.com/gh/pandorasNox/kubernetes-default-container-resources)
+
 ### (re)generate cert.pem and key.pem for TLS test support
 `make certs`
 

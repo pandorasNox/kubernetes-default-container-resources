@@ -43,14 +43,23 @@ spec:
         # args:
         #   - --dry-run
         readinessProbe:
-          tcpSocket:
-            port: 8083
-        livenessProbe:
           httpGet:
             path: /healthz
             port: 8083
             scheme: HTTPS
-          # initialDelaySeconds: 15
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+          periodSeconds: 5
+        livenessProbe:
+          # tcpSocket:
+          #   port: 8083
+          httpGet:
+            path: /healthz
+            port: 8083
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          timeoutSeconds: 1
+          periodSeconds: 5
         volumeMounts:
         - name: tls-certs
           mountPath: "/certs"

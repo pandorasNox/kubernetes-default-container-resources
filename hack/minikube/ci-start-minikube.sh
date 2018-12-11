@@ -7,4 +7,4 @@ mkdir -p "$HOME/.kube"
 touch "$HOME/.kube/config"
 
 export KUBECONFIG="$HOME/.kube/config"
-sudo -E minikube start --vm-driver=none
+sudo -E minikube start --vm-driver=none --extra-config=apiserver.admission-control="LimitRanger,NamespaceExists,NamespaceLifecycle,ResourceQuota,ServiceAccount,DefaultStorageClass,ValidatingAdmissionWebhook,MutatingAdmissionWebhook"
