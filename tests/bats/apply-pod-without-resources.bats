@@ -13,7 +13,7 @@
 @test "apply pod without resources sets default resources" {
 
     # create test namespace
-    test_ns=draco-test-$(uuidgen)
+    test_ns=draco-test-$(uuidgen | tr "[:upper:]" "[:lower:]")
     echo "debug | namespace: $test_ns" >&2
     kubectl create ns $test_ns > /dev/null
 
