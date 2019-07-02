@@ -1,6 +1,8 @@
 #!/bin/bash
 
-until [ $(kubectl get ns mutating-webhook 2>/dev/null | wc -l) -eq 0 ]; do
+NAMESPACE=mutating-webhook
+
+until [ $(kubectl get ns ${NAMESPACE} 2>/dev/null | wc -l) -eq 0 ]; do
     echo -n "."
     sleep 1
 done
